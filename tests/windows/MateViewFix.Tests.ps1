@@ -82,4 +82,13 @@ Describe 'MateView correction execution' {
 
         { Invoke-MateViewCorrection -Monitor $monitor -Corrections @() } | Should -Not -Throw
     }
+
+    It 'rejects writes outside volume and mute VCP codes' {
+        $monitor = [pscustomobject]@{}
+        $monitor | Add-Member -MemberType ScriptMethod -Name Write -Value { param($code, $value) }
+        $unsafe = @([pscustomobject]@{ Code = 0x10; Value = 50 })
+
+        { Invoke-MateViewCorrection -Monitor $monitor -Corrections $unsafe } |
+            Should -Throw '*0x62*0x8D*'
+    }
 }

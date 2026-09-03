@@ -41,7 +41,8 @@ function Stop-MateViewWatchdog {
     if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and $watchdogPid -gt 0 -and $watchdogPid -ne $PID) {
         $process = Get-CimInstance Win32_Process -Filter "ProcessId = $watchdogPid" -ErrorAction SilentlyContinue
         if ($null -ne $process -and
-            $process.CommandLine -like "*$installedScript*" -and
+            -not [string]::IsNullOrWhiteSpace($process.CommandLine) -and
+            $process.CommandLine.IndexOf($installedScript, [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
             $process.CommandLine -match '(?i)\bwatch\b') {
             Stop-Process -Id $watchdogPid -Force -ErrorAction SilentlyContinue
         }

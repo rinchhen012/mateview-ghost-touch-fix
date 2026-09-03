@@ -294,6 +294,15 @@ function Invoke-MateViewCorrection {
     )
 
     foreach ($correction in $Corrections) {
+        if ($correction.Code -ne 0x62 -and $correction.Code -ne 0x8D) {
+            throw 'Only VCP 0x62 (volume) and 0x8D (mute) writes are allowed.'
+        }
+        if ($correction.Code -eq 0x62 -and ($correction.Value -lt 0 -or $correction.Value -gt 100)) {
+            throw 'VCP 0x62 volume must be between 0 and 100.'
+        }
+        if ($correction.Code -eq 0x8D -and $correction.Value -ne 2) {
+            throw 'VCP 0x8D may only be written with the unmuted value 2.'
+        }
         $Monitor.Write([byte] $correction.Code, [uint32] $correction.Value)
     }
 }
