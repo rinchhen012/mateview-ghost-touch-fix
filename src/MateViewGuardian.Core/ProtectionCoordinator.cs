@@ -64,7 +64,23 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
                     error: null));
             }
 
-            await platform.ApplyHidBlockAsync(cancellationToken).ConfigureAwait(false);
+            var blockedIds = await platform.ApplyHidBlockAsync(
+                Settings.DisabledHidInstanceIds,
+                cancellationToken).ConfigureAwait(false);
+            var normalizedBlockedIds = blockedIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (!Settings.DisabledHidInstanceIds.SequenceEqual(
+                    normalizedBlockedIds,
+                    StringComparer.OrdinalIgnoreCase))
+            {
+                Settings = (Settings with { DisabledHidInstanceIds = normalizedBlockedIds }).Normalize();
+                await settingsStore.SaveAsync(Settings, cancellationToken).ConfigureAwait(false);
+                SettingsChanged?.Invoke(this, Settings);
+            }
+
             var observation = await platform.ObserveAsync(cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(observation.Error))
             {

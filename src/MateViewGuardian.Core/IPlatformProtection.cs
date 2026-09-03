@@ -13,7 +13,9 @@ public sealed record PlatformObservation(
 
 public interface IPlatformProtection
 {
-    Task ApplyHidBlockAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<string>> ApplyHidBlockAsync(
+        IReadOnlyList<string> recordedIds,
+        CancellationToken cancellationToken);
 
     Task ClearHidBlockAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken);
 

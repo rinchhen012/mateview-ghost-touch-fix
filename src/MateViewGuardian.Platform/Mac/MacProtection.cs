@@ -24,16 +24,18 @@ public sealed partial class MacProtection : IPlatformProtection
         this.ddcPath = RequirePath(ddcPath, nameof(ddcPath));
     }
 
-    public async Task ApplyHidBlockAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<string>> ApplyHidBlockAsync(
+        IReadOnlyList<string> recordedIds,
+        CancellationToken cancellationToken)
     {
         if (!await IsHidPresentAsync(cancellationToken).ConfigureAwait(false))
         {
-            return;
+            return recordedIds;
         }
 
         if (await IsMappingActiveAsync(cancellationToken).ConfigureAwait(false))
         {
-            return;
+            return recordedIds;
         }
 
         var result = await runner.RunAsync(
@@ -42,6 +44,7 @@ public sealed partial class MacProtection : IPlatformProtection
             CommandTimeout,
             cancellationToken).ConfigureAwait(false);
         EnsureSuccess(result, "apply the MateView HID block");
+        return recordedIds;
     }
 
     public async Task ClearHidBlockAsync(

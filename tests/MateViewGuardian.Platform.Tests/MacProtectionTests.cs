@@ -18,7 +18,7 @@ public sealed class MacProtectionTests
             Result(string.Empty));
         var protection = new MacProtection(runner, "/usr/bin/hidutil", "/app/ASDDC");
 
-        await protection.ApplyHidBlockAsync(default);
+        await protection.ApplyHidBlockAsync([], default);
 
         Assert.Equal(3, runner.Calls.Count);
         var set = runner.Calls[2];
@@ -46,7 +46,7 @@ public sealed class MacProtectionTests
             Result(mapping));
         var protection = new MacProtection(runner, "hidutil", "ASDDC");
 
-        await protection.ApplyHidBlockAsync(default);
+        await protection.ApplyHidBlockAsync([], default);
 
         Assert.Equal(2, runner.Calls.Count);
     }

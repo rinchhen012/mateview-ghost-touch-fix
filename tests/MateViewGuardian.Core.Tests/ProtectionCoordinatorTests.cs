@@ -92,6 +92,21 @@ public sealed class ProtectionCoordinatorTests
         Assert.Equal(30, published?.DesiredVolume);
     }
 
+    [Fact]
+    public async Task EnabledCyclePersistsExactHidIdsReturnedByPlatform()
+    {
+        var platform = new RecordingPlatform
+        {
+            BlockedIds = ["HID\\VID_12D1&PID_10B6&COL01\\ONE"],
+        };
+        var store = new MemorySettingsStore(GuardianSettings.Default);
+        var coordinator = new ProtectionCoordinator(platform, store);
+
+        await coordinator.RunCycleAsync();
+
+        Assert.Equal(platform.BlockedIds, store.Value.DisabledHidInstanceIds);
+    }
+
     private sealed class MemorySettingsStore(GuardianSettings value) : ISettingsStore
     {
         public GuardianSettings Value { get; private set; } = value;
@@ -116,6 +131,8 @@ public sealed class ProtectionCoordinatorTests
 
         public Exception? ObserveException { get; set; }
 
+        public string[] BlockedIds { get; set; } = [];
+
         public bool PauseObservation { get; set; }
 
         public TaskCompletionSource ObservationEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -124,10 +141,12 @@ public sealed class ProtectionCoordinatorTests
 
         public int MaximumConcurrentObservations { get; private set; }
 
-        public Task ApplyHidBlockAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<string>> ApplyHidBlockAsync(
+            IReadOnlyList<string> recordedIds,
+            CancellationToken cancellationToken)
         {
             Calls.Add("hid:block");
-            return Task.CompletedTask;
+            return Task.FromResult<IReadOnlyList<string>>(BlockedIds);
         }
 
         public Task ClearHidBlockAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken)
