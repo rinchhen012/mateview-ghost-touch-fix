@@ -1,5 +1,6 @@
 using MateViewGuardian.App;
 using MateViewGuardian.Core;
+using MateViewGuardian.Platform.Startup;
 using Xunit;
 
 namespace MateViewGuardian.App.Tests;
@@ -44,14 +45,16 @@ public sealed class MainWindowViewModelTests
     public async Task StartAtLoginSettingIsPersisted()
     {
         var store = new MemorySettingsStore(GuardianSettings.Default);
+        var startup = new RecordingStartupManager();
         var viewModel = new MainWindowViewModel(
-            new ProtectionCoordinator(new RecordingPlatform(), store));
+            new ProtectionCoordinator(new RecordingPlatform(), store), startup);
         await viewModel.InitializeAsync();
 
         await viewModel.SetStartAtLoginAsync(false);
 
         Assert.False(viewModel.StartAtLogin);
         Assert.False(store.Value.StartAtLogin);
+        Assert.Equal([true, false], startup.Values);
     }
 
     [Fact]
@@ -109,6 +112,19 @@ public sealed class MainWindowViewModelTests
         public Task WriteDdcAsync(DdcCorrection correction, CancellationToken cancellationToken)
         {
             Writes.Add(correction);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingStartupManager : IStartupManager
+    {
+        public bool IsEnabled { get; private set; } = true;
+        public List<bool> Values { get; } = [];
+
+        public Task SetEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            IsEnabled = enabled;
+            Values.Add(enabled);
             return Task.CompletedTask;
         }
     }

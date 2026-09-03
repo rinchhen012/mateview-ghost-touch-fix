@@ -6,21 +6,30 @@ namespace MateViewGuardian.App;
 
 public sealed partial class MainWindow : Window
 {
-    private readonly MainWindowViewModel viewModel;
-    private readonly Func<bool> isQuitting;
+    private MainWindowViewModel? viewModel;
+    private Func<bool> isQuitting = () => false;
     private bool synchronizing;
 
-    public MainWindow(MainWindowViewModel viewModel, Func<bool> isQuitting)
+    public MainWindow()
     {
         InitializeComponent();
+        Closing += OnClosing;
+    }
+
+    public MainWindow(MainWindowViewModel viewModel, Func<bool> isQuitting)
+        : this()
+    {
         this.viewModel = viewModel;
         this.isQuitting = isQuitting;
         DataContext = viewModel;
-        Closing += OnClosing;
     }
 
     public void SynchronizeControls()
     {
+        if (viewModel is null)
+        {
+            return;
+        }
         synchronizing = true;
         ProtectionToggle.IsChecked = viewModel.ProtectionEnabled;
         StartupToggle.IsChecked = viewModel.StartAtLogin;
@@ -30,6 +39,10 @@ public sealed partial class MainWindow : Window
 
     public void ShowDiagnostics()
     {
+        if (viewModel is null)
+        {
+            return;
+        }
         var window = CreateMessageWindow("Diagnostics", viewModel.CreateDiagnostics(), "Close");
         _ = window.ShowDialog(this);
     }
@@ -54,7 +67,7 @@ public sealed partial class MainWindow : Window
 
     private async void ProtectionChanged(object? sender, RoutedEventArgs eventArgs)
     {
-        if (synchronizing)
+        if (synchronizing || viewModel is null)
         {
             return;
         }
@@ -64,7 +77,7 @@ public sealed partial class MainWindow : Window
 
     private async void StartupChanged(object? sender, RoutedEventArgs eventArgs)
     {
-        if (synchronizing)
+        if (synchronizing || viewModel is null)
         {
             return;
         }
@@ -74,17 +87,30 @@ public sealed partial class MainWindow : Window
 
     private async void SetVolumeClicked(object? sender, RoutedEventArgs eventArgs)
     {
+        if (viewModel is null)
+        {
+            return;
+        }
         await viewModel.SetDesiredVolumeAsync((int)Math.Round(VolumeSlider.Value));
         SynchronizeControls();
     }
 
-    private async void ApplyClicked(object? sender, RoutedEventArgs eventArgs) =>
-        await viewModel.ApplyNowAsync();
+    private async void ApplyClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (viewModel is not null)
+        {
+            await viewModel.ApplyNowAsync();
+        }
+    }
 
     private void DiagnosticsClicked(object? sender, RoutedEventArgs eventArgs) => ShowDiagnostics();
 
     private async void RestoreClicked(object? sender, RoutedEventArgs eventArgs)
     {
+        if (viewModel is null)
+        {
+            return;
+        }
         await viewModel.SetProtectionEnabledAsync(false);
         SynchronizeControls();
     }

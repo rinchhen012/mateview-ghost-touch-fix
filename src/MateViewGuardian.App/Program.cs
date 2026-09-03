@@ -6,10 +6,13 @@ internal static class Program
 {
     internal static bool StartHidden { get; private set; }
 
+    internal static bool RestoreAndExit { get; private set; }
+
     [STAThread]
     public static void Main(string[] args)
     {
         StartHidden = args.Contains("--background", StringComparer.OrdinalIgnoreCase);
+        RestoreAndExit = args.Contains("--restore-and-exit", StringComparer.OrdinalIgnoreCase);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

@@ -2,18 +2,23 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using MateViewGuardian.Core;
+using MateViewGuardian.Platform.Startup;
 
 namespace MateViewGuardian.App;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly ProtectionCoordinator coordinator;
+    private readonly IStartupManager? startupManager;
     private readonly SynchronizationContext? synchronizationContext;
     private bool isBusy;
 
-    public MainWindowViewModel(ProtectionCoordinator coordinator)
+    public MainWindowViewModel(
+        ProtectionCoordinator coordinator,
+        IStartupManager? startupManager = null)
     {
         this.coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+        this.startupManager = startupManager;
         synchronizationContext = SynchronizationContext.Current;
         coordinator.SettingsChanged += (_, settings) => Dispatch(() => PublishSettings(settings));
         coordinator.StatusChanged += (_, status) => Dispatch(() => PublishStatus(status));
@@ -49,6 +54,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         await coordinator.InitializeAsync(cancellationToken).ConfigureAwait(false);
         PublishSettings(coordinator.Settings);
+        if (startupManager is not null)
+        {
+            await startupManager.SetEnabledAsync(coordinator.Settings.StartAtLogin, cancellationToken)
+                .ConfigureAwait(false);
+        }
         await ApplyNowAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -82,9 +92,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public Task SetStartAtLoginAsync(bool enabled, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(() => coordinator.UpdateSettingsAsync(
-            settings => settings with { StartAtLogin = enabled },
-            cancellationToken));
+        ExecuteAsync(async () =>
+        {
+            if (startupManager is not null)
+            {
+                await startupManager.SetEnabledAsync(enabled, cancellationToken).ConfigureAwait(false);
+            }
+            await coordinator.UpdateSettingsAsync(
+                settings => settings with { StartAtLogin = enabled },
+                cancellationToken).ConfigureAwait(false);
+        });
 
     public Task ApplyNowAsync(CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => coordinator.RunCycleAsync(cancellationToken));

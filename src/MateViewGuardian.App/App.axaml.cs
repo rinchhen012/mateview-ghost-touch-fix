@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using MateViewGuardian.Core;
 using MateViewGuardian.Platform;
 using MateViewGuardian.Platform.Mac;
+using MateViewGuardian.Platform.Startup;
 using MateViewGuardian.Platform.Windows;
 
 namespace MateViewGuardian.App;
@@ -19,6 +20,9 @@ public sealed partial class App : Application
     private TrayIcon? trayIcon;
     private NativeMenuItem? protectionItem;
     private NativeMenuItem? startupItem;
+    private JsonSettingsStore? settingsStore;
+    private LegacyMigration? legacyMigration;
+    private bool settingsExisted;
     private bool isQuitting;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -28,8 +32,11 @@ public sealed partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            var coordinator = CreateCoordinator();
-            viewModel = new MainWindowViewModel(coordinator);
+            var runtime = CreateRuntime();
+            settingsStore = runtime.SettingsStore;
+            legacyMigration = runtime.Migration;
+            settingsExisted = File.Exists(runtime.SettingsPath);
+            viewModel = new MainWindowViewModel(runtime.Coordinator, runtime.StartupManager);
             mainWindow = new MainWindow(viewModel, () => isQuitting);
             desktop.MainWindow = mainWindow;
             CreateTray(desktop);
@@ -46,7 +53,30 @@ public sealed partial class App : Application
             return;
         }
 
+        if (!settingsExisted && settingsStore is not null && legacyMigration is not null)
+        {
+            var migrated = await legacyMigration.ImportSettingsAsync(GuardianSettings.Default);
+            await settingsStore.SaveAsync(migrated);
+        }
+
         await viewModel.InitializeAsync();
+        if (Program.RestoreAndExit)
+        {
+            await viewModel.SetProtectionEnabledAsync(false);
+            await viewModel.SetStartAtLoginAsync(false);
+            if (legacyMigration is not null)
+            {
+                await legacyMigration.StopLegacyStartupAsync();
+            }
+            isQuitting = true;
+            trayIcon?.Dispose();
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+            {
+                lifetime.Shutdown();
+            }
+            return;
+        }
+
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             mainWindow.SynchronizeControls();
@@ -57,21 +87,43 @@ public sealed partial class App : Application
             }
         });
         await viewModel.StartAsync();
+        if (legacyMigration is not null)
+        {
+            await legacyMigration.StopLegacyStartupAsync();
+        }
     }
 
-    private ProtectionCoordinator CreateCoordinator()
+    private RuntimeServices CreateRuntime()
     {
-        var dataDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MateViewGuardian");
-        var settings = new JsonSettingsStore(Path.Combine(dataDirectory, "settings.json"));
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var dataDirectory = OperatingSystem.IsMacOS()
+            ? Path.Combine(home, "Library", "Application Support", "MateViewGuardian")
+            : Path.Combine(localAppData, "MateViewGuardian");
+        var settingsPath = Path.Combine(dataDirectory, "settings.json");
+        var settings = new JsonSettingsStore(settingsPath);
         IPlatformProtection platform;
+        IStartupManager startupManager;
+        LegacyMigration migration;
         if (OperatingSystem.IsMacOS())
         {
             platform = new MacProtection(
                 new ProcessRunner(),
                 "/usr/bin/hidutil",
                 FindResource("ASDDC"));
+            var launchAgent = Path.Combine(
+                home, "Library", "LaunchAgents", "com.mateview.guardian.plist");
+            startupManager = new MacStartupManager(
+                launchAgent,
+                "/Applications/MateView Guardian.app/Contents/MacOS/MateViewGuardian.App");
+            var legacyPlist = Path.Combine(
+                home, "Library", "LaunchAgents", "com.mateview-ghost-touch-fix.plist");
+            migration = new LegacyMigration(
+                legacyPlist,
+                null,
+                null,
+                cancellationToken => StopLegacyMacAsync(legacyPlist, cancellationToken));
         }
         else if (OperatingSystem.IsWindows())
         {
@@ -81,13 +133,33 @@ public sealed partial class App : Application
                 "powershell.exe",
                 FindResource(Path.Combine("platform-tools", "windows", "MateViewHid.ps1")));
             platform = new WindowsProtection(new WindowsMonitorApi(), hid);
+            var launcher = Path.Combine(
+                roamingAppData,
+                "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "MateViewGuardian.cmd");
+            startupManager = new WindowsStartupManager(
+                launcher,
+                Path.Combine(AppContext.BaseDirectory, "MateViewGuardian.App.exe"));
+            var legacyDirectory = Path.Combine(localAppData, "MateViewGhostTouchFix");
+            var legacyScript = Path.Combine(legacyDirectory, "MateViewFix.ps1");
+            migration = new LegacyMigration(
+                null,
+                Path.Combine(legacyDirectory, "config.json"),
+                Path.Combine(
+                    roamingAppData,
+                    "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "MateViewGhostTouchFix.cmd"),
+                cancellationToken => StopLegacyWindowsAsync(legacyScript, cancellationToken));
         }
         else
         {
             throw new PlatformNotSupportedException("MateView Guardian supports macOS and Windows.");
         }
 
-        return new ProtectionCoordinator(platform, settings);
+        return new RuntimeServices(
+            new ProtectionCoordinator(platform, settings),
+            settings,
+            settingsPath,
+            startupManager,
+            migration);
     }
 
     private void CreateTray(IClassicDesktopStyleApplicationLifetime desktop)
@@ -266,4 +338,37 @@ public sealed partial class App : Application
         var bundleResource = Path.GetFullPath(Path.Combine(baseDirectory, "..", "Resources", relativePath));
         return File.Exists(bundleResource) ? bundleResource : direct;
     }
+
+    private static async Task StopLegacyMacAsync(string plistPath, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(plistPath))
+        {
+            return;
+        }
+        await new ProcessRunner().RunAsync(
+            "/bin/launchctl",
+            ["unload", plistPath],
+            TimeSpan.FromSeconds(5),
+            cancellationToken);
+    }
+
+    private static async Task StopLegacyWindowsAsync(string scriptPath, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(scriptPath))
+        {
+            return;
+        }
+        await new ProcessRunner().RunAsync(
+            "powershell.exe",
+            ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "Disable"],
+            TimeSpan.FromSeconds(10),
+            cancellationToken);
+    }
+
+    private sealed record RuntimeServices(
+        ProtectionCoordinator Coordinator,
+        JsonSettingsStore SettingsStore,
+        string SettingsPath,
+        IStartupManager StartupManager,
+        LegacyMigration Migration);
 }
