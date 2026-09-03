@@ -297,10 +297,10 @@ git add README.md LICENSE .github scripts tests/package-test.sh
 git commit -m "docs: add packaging and release workflow"
 ```
 
-- [ ] **Step 8: Create private GitHub repository and push**
+- [ ] **Step 8: Create public GitHub repository and push**
 
 ```bash
-gh repo create rinchhen012/mateview-ghost-touch-fix --private --source=. --remote=origin --push
+gh repo create rinchhen012/mateview-ghost-touch-fix --public --source=. --remote=origin --push
 ```
 
 - [ ] **Step 9: Verify remote CI, tag, and release**
