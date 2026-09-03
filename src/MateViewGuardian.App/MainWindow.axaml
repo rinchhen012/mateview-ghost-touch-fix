@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:MateViewGuardian.App"
+        x:Class="MateViewGuardian.App.MainWindow"
+        x:DataType="local:MainWindowViewModel"
+        Title="MateView Guardian"
+        Width="520" Height="650"
+        MinWidth="460" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+  <ScrollViewer>
+    <StackPanel Margin="28" Spacing="18">
+      <StackPanel Spacing="4">
+        <TextBlock Text="MateView Guardian" FontSize="28" FontWeight="SemiBold" />
+        <TextBlock Text="Block the faulty touch strip and hold the monitor speaker at your target volume."
+                   TextWrapping="Wrap" Opacity="0.72" />
+      </StackPanel>
+
+      <Border CornerRadius="12" Padding="18" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+          <TextBlock Text="{Binding OverallStatusText}" FontSize="20" FontWeight="SemiBold" />
+          <ToggleSwitch x:Name="ProtectionToggle" Grid.Column="1"
+                        OnContent="On" OffContent="Off"
+                        IsCheckedChanged="ProtectionChanged" />
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                     Text="Protection leaves normal keyboard, Windows/macOS, app, and headphone volume controls working."
+                     TextWrapping="Wrap" Opacity="0.68" />
+        </Grid>
+      </Border>
+
+      <Grid ColumnDefinitions="28,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+        <TextBlock Text="●" Foreground="#49A078" />
+        <TextBlock Grid.Column="1" Text="{Binding DisplayStatusText}" />
+        <TextBlock Grid.Row="1" Text="●" Foreground="#49A078" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding HidStatusText}" />
+        <TextBlock Grid.Row="2" Text="●" Foreground="#49A078" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DdcStatusText}" />
+      </Grid>
+
+      <Border CornerRadius="12" Padding="18" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Monitor speaker target" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="1" Text="{Binding DesiredVolume, StringFormat={}{0}%}" FontSize="18" />
+          </Grid>
+          <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" TickFrequency="1" />
+          <Button HorizontalAlignment="Right" Content="Set target volume" Click="SetVolumeClicked" />
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel>
+          <TextBlock Text="Start at login" FontWeight="SemiBold" />
+          <TextBlock Text="Keep protection active after restart." Opacity="0.68" />
+        </StackPanel>
+        <ToggleSwitch x:Name="StartupToggle" Grid.Column="1" IsCheckedChanged="StartupChanged" />
+      </Grid>
+
+      <TextBlock Text="{Binding ErrorText}" Foreground="#D13438" TextWrapping="Wrap" />
+
+      <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+        <Button Content="Apply now" Click="ApplyClicked" />
+        <Button Content="Diagnostics" Click="DiagnosticsClicked" />
+        <Button Content="Restore touch strip" Click="RestoreClicked" />
+      </StackPanel>
+
+      <Border CornerRadius="8" Padding="12" Background="#18F0A000">
+        <TextBlock Text="The app blocks host volume events and corrects the internal speaker volume. Huawei's firmware OSD and LED are generated inside the monitor and may still light up."
+                   TextWrapping="Wrap" FontSize="12" />
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</Window>

@@ -5,3 +5,5 @@ testResults.xml
 **/bin/
 **/obj/
 .DS_Store
+src/MateViewGuardian.App/Assets/*.png
+src/MateViewGuardian.App/Assets/*.ico
