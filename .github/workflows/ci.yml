@@ -12,14 +12,21 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Test macOS scripts
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Test .NET projects
+        run: dotnet test MateViewGuardian.slnx --configuration Release --nologo
+      - name: Test macOS and legacy packages
         run: |
           sh tests/macos/mateview-hid-filter-test.sh
           sh tests/macos/install-test.sh
-          sh -n macos/*.sh tests/macos/*.sh
-          plutil -lint macos/com.mateview-ghost-touch-fix.plist.template
-      - name: Test release packaging
-        run: sh tests/package-test.sh
+          sh tests/macos/fetch-ddc-test.sh
+          sh tests/package-test.sh
+          sh -n macos/*.sh scripts/*.sh tests/macos/*.sh tests/*.sh packaging/macos/*.command
+          plutil -lint macos/com.mateview-ghost-touch-fix.plist.template packaging/macos/Info.plist
+      - name: Test self-contained GUI packages
+        run: sh tests/gui-package-test.sh
 
   windows:
     runs-on: windows-latest
@@ -32,9 +39,14 @@ jobs:
         shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Test .NET projects
+        run: dotnet test MateViewGuardian.slnx --configuration Release --nologo
       - name: Install Pester
         run: Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
-      - name: Run Windows tests
+      - name: Test Windows helpers
         run: |
           Import-Module Pester -RequiredVersion 5.7.1
           $result = Invoke-Pester tests/windows -Output Detailed -PassThru

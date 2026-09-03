@@ -58,8 +58,19 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
         CancellationToken cancellationToken)
     {
         var detected = await DetectAsync(cancellationToken).ConfigureAwait(false);
-        var recoveryIds = NormalizeAllowed(detected.Concat(recordedIds)).ToArray();
-        await MutateAsync("Disable", recoveryIds, cancellationToken).ConfigureAwait(false);
+        var recorded = NormalizeAllowed(recordedIds).ToArray();
+        var recoveryIds = NormalizeAllowed(detected.Concat(recorded)).ToArray();
+        var newIds = detected
+            .Where(id => !recorded.Contains(id, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        try
+        {
+            await MutateAsync("Disable", newIds, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ElevationDeniedException)
+        {
+            throw new ElevationDeniedException(recoveryIds);
+        }
         return recoveryIds;
     }
 

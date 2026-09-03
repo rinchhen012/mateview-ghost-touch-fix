@@ -54,6 +54,12 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
             {
                 await platform.ClearHidBlockAsync(Settings.DisabledHidInstanceIds, cancellationToken)
                     .ConfigureAwait(false);
+                if (Settings.DisabledHidInstanceIds.Length > 0)
+                {
+                    Settings = Settings with { DisabledHidInstanceIds = [] };
+                    await settingsStore.SaveAsync(Settings, cancellationToken).ConfigureAwait(false);
+                    SettingsChanged?.Invoke(this, Settings);
+                }
                 CurrentRetryMilliseconds = RetryPolicy.Next(CurrentRetryMilliseconds, succeeded: true);
                 return PublishStatus(GuardianStatus.Derive(
                     enabled: false,

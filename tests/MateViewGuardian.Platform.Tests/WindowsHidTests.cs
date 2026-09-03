@@ -49,7 +49,20 @@ public sealed class WindowsHidTests
         Assert.Contains("Disable", call.Arguments);
         Assert.Equal(1, call.Arguments.Count(argument => argument == "-InstanceId"));
         Assert.Contains(MateViewOne, call.Arguments);
-        Assert.Contains(MateViewTwo, call.Arguments);
+        Assert.DoesNotContain(MateViewTwo, call.Arguments);
+    }
+
+    [Fact]
+    public async Task AlreadyRecordedDevicesDoNotRequestElevationAgain()
+    {
+        var processes = new QueueProcessRunner(Result("[\"" + JsonEscape(MateViewOne) + "\"]"));
+        var elevation = new RecordingElevationRunner();
+        var protection = Create(processes, elevation);
+
+        var ids = await protection.DisableAsync([MateViewOne], default);
+
+        Assert.Equal([MateViewOne], ids);
+        Assert.Empty(elevation.Calls);
     }
 
     [Fact]

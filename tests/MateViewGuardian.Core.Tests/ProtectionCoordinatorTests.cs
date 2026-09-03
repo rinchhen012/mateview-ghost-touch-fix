@@ -24,14 +24,20 @@ public sealed class ProtectionCoordinatorTests
     [Fact]
     public async Task DisabledCycleClearsHidAndDoesNotTouchDdc()
     {
-        var settings = GuardianSettings.Default with { ProtectionEnabled = false };
+        var settings = GuardianSettings.Default with
+        {
+            ProtectionEnabled = false,
+            DisabledHidInstanceIds = ["HID\\VID_12D1&PID_10B6\\ONE"],
+        };
         var platform = new RecordingPlatform();
-        var coordinator = new ProtectionCoordinator(platform, new MemorySettingsStore(settings));
+        var store = new MemorySettingsStore(settings);
+        var coordinator = new ProtectionCoordinator(platform, store);
 
         var status = await coordinator.RunCycleAsync();
 
         Assert.Equal(GuardianState.Disabled, status.State);
         Assert.Equal(["hid:clear"], platform.Calls);
+        Assert.Empty(store.Value.DisabledHidInstanceIds);
     }
 
     [Fact]

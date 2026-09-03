@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 asset_dir="$repo_root/src/MateViewGuardian.App/Assets"
 
 if ! command -v sips >/dev/null 2>&1; then
