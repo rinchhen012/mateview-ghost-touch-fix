@@ -9,6 +9,8 @@ param(
 
     [Nullable[int]] $MonitorIndex,
 
+    [switch] $SkipStart,
+
     [string] $LocalAppDataRoot = $env:LOCALAPPDATA,
 
     [string] $RoamingAppDataRoot = $env:APPDATA
@@ -27,14 +29,35 @@ $installDirectory = Join-Path $LocalAppDataRoot 'MateViewGhostTouchFix'
 $startupDirectory = Join-Path $RoamingAppDataRoot 'Microsoft/Windows/Start Menu/Programs/Startup'
 $launcherPath = Join-Path $startupDirectory 'MateViewGhostTouchFix.cmd'
 $installedScript = Join-Path $installDirectory 'MateViewFix.ps1'
+$pidPath = Join-Path $installDirectory 'watchdog.pid'
+
+function Stop-MateViewWatchdog {
+    if (-not (Test-Path -LiteralPath $pidPath)) {
+        return
+    }
+
+    $watchdogPid = 0
+    [void] [int]::TryParse((Get-Content -LiteralPath $pidPath -Raw).Trim(), [ref] $watchdogPid)
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and $watchdogPid -gt 0 -and $watchdogPid -ne $PID) {
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $watchdogPid" -ErrorAction SilentlyContinue
+        if ($null -ne $process -and
+            $process.CommandLine -like "*$installedScript*" -and
+            $process.CommandLine -match '(?i)\bwatch\b') {
+            Stop-Process -Id $watchdogPid -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Remove-Item -LiteralPath $pidPath -Force -ErrorAction SilentlyContinue
+}
 
 function Disable-MateViewStartup {
+    Stop-MateViewWatchdog
     if (Test-Path -LiteralPath $launcherPath) {
         Remove-Item -LiteralPath $launcherPath -Force
     }
 }
 
 function Install-MateViewFix {
+    Disable-MateViewStartup
     New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $startupDirectory -Force | Out-Null
 
@@ -50,6 +73,11 @@ function Install-MateViewFix {
     $indexArgument = if ($null -eq $MonitorIndex) { '' } else { " -MonitorIndex $([int] $MonitorIndex)" }
     $launcher = "@echo off`r`n@powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installedScript`" watch -DesiredVolume $DesiredVolume$indexArgument`r`n"
     [System.IO.File]::WriteAllText($launcherPath, $launcher, [System.Text.Encoding]::ASCII)
+
+    if (-not $SkipStart -and [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        $arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installedScript`" watch -DesiredVolume $DesiredVolume$indexArgument"
+        Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WindowStyle Hidden
+    }
 
     Write-Output "Installed MateView Ghost Touch Fix at $installDirectory"
 }

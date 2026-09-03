@@ -35,7 +35,19 @@ switch ($Command) {
         Invoke-MateViewOnce -DesiredVolume $DesiredVolume -Index $MonitorIndex
     }
     'watch' {
-        Watch-MateView -DesiredVolume $DesiredVolume -Index $MonitorIndex
+        $pidFile = Join-Path $PSScriptRoot 'watchdog.pid'
+        [System.IO.File]::WriteAllText($pidFile, [string] $PID, [System.Text.Encoding]::ASCII)
+        try {
+            Watch-MateView -DesiredVolume $DesiredVolume -Index $MonitorIndex
+        }
+        finally {
+            if (Test-Path -LiteralPath $pidFile) {
+                $recordedPid = (Get-Content -LiteralPath $pidFile -Raw).Trim()
+                if ($recordedPid -eq [string] $PID) {
+                    Remove-Item -LiteralPath $pidFile -Force
+                }
+            }
+        }
     }
     'status' {
         $result = Invoke-MateViewOnce -DesiredVolume $DesiredVolume -Index $MonitorIndex

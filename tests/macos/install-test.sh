@@ -53,6 +53,14 @@ assert_contains() {
     printf '%s' "$haystack" | grep -F -- "$needle" >/dev/null || fail "missing: $needle"
 }
 
+assert_not_contains() {
+    haystack=$1
+    needle=$2
+    if printf '%s' "$haystack" | grep -F -- "$needle" >/dev/null; then
+        fail "unexpected: $needle"
+    fi
+}
+
 run_lifecycle() {
     env \
         MATEVIEW_USER_HOME="$test_user_home" \
@@ -79,6 +87,17 @@ assert_contains "$plist_contents" '<key>RunAtLoad</key>'
 assert_contains "$plist_contents" '<key>KeepAlive</key>'
 assert_contains "$(cat "$launchctl_calls")" "bootstrap gui/501 $plist"
 assert_contains "$(cat "$hidutil_calls")" 'HIDKeyboardModifierMappingSrc":0xC000000E9'
+
+: >"$launchctl_calls"
+: >"$hidutil_calls"
+run_lifecycle "$install_script" disable >/dev/null
+assert_contains "$(cat "$launchctl_calls")" 'bootout gui/501/com.mateview-ghost-touch-fix'
+assert_not_contains "$(cat "$launchctl_calls")" 'bootstrap gui/501'
+assert_contains "$(cat "$hidutil_calls")" '{"UserKeyMapping":[]}'
+
+: >"$launchctl_calls"
+run_lifecycle "$install_script" enable >/dev/null
+assert_contains "$(cat "$launchctl_calls")" "bootstrap gui/501 $plist"
 
 run_lifecycle "$uninstall_script" >/dev/null
 assert_not_exists "$plist"

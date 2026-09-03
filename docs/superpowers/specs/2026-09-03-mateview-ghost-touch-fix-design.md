@@ -39,7 +39,7 @@ Maintain a configured monitor speaker volume and mute state through DDC/CI:
 
 On Windows, the watchdog uses the native Low-Level Monitor Configuration API in `Dxva2.dll` over DisplayPort. It selects the physical display whose description/EDID matches `ZQE-CAA` and never writes to another monitor.
 
-On macOS, the watchdog uses the verified Apple Silicon DDC transport and targets the monitor by EDID/IO display identity. It is optional when the HID filter alone solves the problem.
+The shipped macOS fix uses the HID layer because that is the path that changes the current macOS output, including Bluetooth headphones. The DDC watchdog is shipped for the DisplayPort-only Windows setup.
 
 ## Alternatives rejected
 
@@ -57,12 +57,12 @@ Continuously writing volume without first reading it would create needless DDC t
 
 ## User controls
 
-Each platform provides commands for:
+The packages provide platform-appropriate commands for:
 
 - `enable`: activate filtering/watchdog behavior.
 - `disable`: stop it without deleting files.
 - `status`: show monitor detection, current DDC values, and active components.
-- `set-volume <0-100>`: update the desired speaker volume.
+- Windows `set-volume <0-100>`: update the desired speaker volume.
 - `uninstall`: remove startup registration and restore MateView-specific host mappings.
 
 Defaults are volume `60`, unmuted, a 500 ms active polling interval, and exponential retry up to 10 seconds while unavailable.
@@ -71,10 +71,10 @@ Defaults are volume `60`, unmuted, a 500 ms active polling interval, and exponen
 
 - Every DDC write is restricted to `ZQE-CAA`.
 - Configuration rejects volume values outside `0-100`.
-- The original macOS MateView mapping is captured before the first change and restored on uninstall.
+- macOS removal clears the mapping only on the matching MateView HID device; reconnecting the device also resets transient `hidutil` state.
 - DDC failures are logged and retried; they do not trigger monitor resets or writes to other VCP codes.
 - The utility never writes VCP `0xCA`, input selection, brightness, contrast, or power state during normal operation.
-- Startup jobs run in the user context where possible. Windows installation may request elevation only for startup registration if required.
+- Startup jobs run in the user context. Neither installer requires administrator rights.
 
 ## Verification
 

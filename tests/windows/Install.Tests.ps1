@@ -18,7 +18,7 @@ Describe 'Windows install lifecycle' {
     }
 
     It 'installs package files and a volume-60 startup watchdog' {
-        & $installer Install -DesiredVolume 60 -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
+        & $installer Install -DesiredVolume 60 -SkipStart -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
 
         Join-Path $installDir 'MateViewFix.ps1' | Should -Exist
         Join-Path $installDir 'MateViewFix.psm1' | Should -Exist
@@ -35,15 +35,17 @@ Describe 'Windows install lifecycle' {
     }
 
     It 'disables startup without deleting the installed utility' {
-        & $installer Install -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
+        & $installer Install -SkipStart -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
+        Set-Content -LiteralPath (Join-Path $installDir 'watchdog.pid') -Value '999999'
         & $installer Disable -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
 
         $launcher | Should -Not -Exist
         Join-Path $installDir 'MateViewFix.ps1' | Should -Exist
+        Join-Path $installDir 'watchdog.pid' | Should -Not -Exist
     }
 
     It 'uninstalls only its own files and is idempotent' {
-        & $installer Install -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
+        & $installer Install -SkipStart -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
         & $installer Uninstall -LocalAppDataRoot $localRoot -RoamingAppDataRoot $roamingRoot
 
         $launcher | Should -Not -Exist

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test macOS scripts
+        run: |
+          sh tests/macos/mateview-hid-filter-test.sh
+          sh tests/macos/install-test.sh
+          sh -n macos/*.sh tests/macos/*.sh
+          plutil -lint macos/com.mateview-ghost-touch-fix.plist.template
+      - name: Test release packaging
+        run: sh tests/package-test.sh
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pester
+        run: Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+      - name: Run Windows tests
+        run: |
+          Import-Module Pester -RequiredVersion 5.7.1
+          $result = Invoke-Pester tests/windows -Output Detailed -PassThru
+          if ($result.Result -ne 'Passed') { exit 1 }
