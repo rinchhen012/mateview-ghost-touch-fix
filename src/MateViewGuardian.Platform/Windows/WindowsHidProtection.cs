@@ -13,7 +13,16 @@ public sealed class ElevationDeniedException : InvalidOperationException
     public IReadOnlyList<string> RecoveryIds { get; }
 }
 
-public sealed class WindowsHidProtection
+public interface IWindowsHidProtection
+{
+    Task<IReadOnlyList<string>> DisableAsync(
+        IReadOnlyList<string> recordedIds,
+        CancellationToken cancellationToken);
+
+    Task EnableAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken);
+}
+
+public sealed class WindowsHidProtection : IWindowsHidProtection
 {
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
     private readonly IProcessRunner processRunner;
