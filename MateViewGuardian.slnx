@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/MateViewGuardian.Core/MateViewGuardian.Core.csproj" />
+  <Project Path="tests/MateViewGuardian.Core.Tests/MateViewGuardian.Core.Tests.csproj" />
+</Solution>

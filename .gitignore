@@ -2,4 +2,6 @@
 dist/
 *.log
 testResults.xml
+**/bin/
+**/obj/
 .DS_Store
