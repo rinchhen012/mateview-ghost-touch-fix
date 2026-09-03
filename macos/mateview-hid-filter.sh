@@ -10,8 +10,10 @@ mateview_present() {
 }
 
 mapping_active() {
-    "$hidutil_bin" property --matching "$match" --get UserKeyMapping 2>/dev/null |
-        grep -F 'HIDKeyboardModifierMappingSrc' >/dev/null
+    property_output=$("$hidutil_bin" property --matching "$match" --get UserKeyMapping 2>/dev/null) || return 1
+    for source in 51539607785 51539607786 51539607757 51539607729; do
+        printf '%s\n' "$property_output" | grep -F "HIDKeyboardModifierMappingSrc = $source" >/dev/null || return 1
+    done
 }
 
 apply_filter() {

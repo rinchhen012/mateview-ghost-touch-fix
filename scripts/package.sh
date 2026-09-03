@@ -1,10 +1,10 @@
 #!/bin/sh
 set -eu
 
-repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+repo_root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 output_dir=${1:-"$repo_root/dist"}
 mkdir -p "$output_dir"
-output_dir=$(CDPATH= cd -- "$output_dir" && pwd)
+output_dir=$(CDPATH='' cd -- "$output_dir" && pwd)
 
 staging_root=$(mktemp -d "${TMPDIR:-/tmp}/mateview-package.XXXXXX")
 trap 'rm -rf "$staging_root"' EXIT HUP INT TERM

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+repo_root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 package_script="$repo_root/scripts/package.sh"
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/mateview-package-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM

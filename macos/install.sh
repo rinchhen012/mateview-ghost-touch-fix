@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 action=${1:-install}
 user_home=${MATEVIEW_USER_HOME:-$HOME}
 gui_uid=${MATEVIEW_GUI_UID:-$(id -u)}

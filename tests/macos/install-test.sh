@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+repo_root=$(CDPATH='' cd -- "$(dirname "$0")/../.." && pwd)
 install_script="$repo_root/macos/install.sh"
 uninstall_script="$repo_root/macos/uninstall.sh"
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/mateview-install-test.XXXXXX")

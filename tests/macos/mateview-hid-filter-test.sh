@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+repo_root=$(CDPATH='' cd -- "$(dirname "$0")/../.." && pwd)
 subject="$repo_root/macos/mateview-hid-filter.sh"
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/mateview-hid-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
@@ -23,6 +23,12 @@ fi
 case "$*" in
     *"--get UserKeyMapping"*)
         if [ "${FAKE_MAPPING_STATE:-inactive}" = "active" ]; then
+            printf '%s\n' \
+                'HIDKeyboardModifierMappingSrc = 51539607785;' \
+                'HIDKeyboardModifierMappingSrc = 51539607786;' \
+                'HIDKeyboardModifierMappingSrc = 51539607757;' \
+                'HIDKeyboardModifierMappingSrc = 51539607729;'
+        elif [ "${FAKE_MAPPING_STATE:-inactive}" = "partial" ]; then
             printf '%s\n' 'HIDKeyboardModifierMappingSrc = 51539607785;'
         else
             printf '%s\n' '(null)'
@@ -73,6 +79,9 @@ status=$(FAKE_MAPPING_STATE=active run_subject status)
 
 status=$(FAKE_MAPPING_STATE=inactive run_subject status)
 [ "$status" = "inactive" ] || fail "expected inactive status, got: $status"
+
+status=$(FAKE_MAPPING_STATE=partial run_subject status)
+[ "$status" = "inactive" ] || fail "expected partial mapping to be inactive, got: $status"
 
 set +e
 status=$(FAKE_MATEVIEW_PRESENT=0 run_subject status 2>/dev/null)
