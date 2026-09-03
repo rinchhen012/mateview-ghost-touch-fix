@@ -1,0 +1,4 @@
+.worktrees/
+dist/
+*.log
+.DS_Store
