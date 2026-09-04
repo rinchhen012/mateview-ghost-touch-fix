@@ -1,5 +1,8 @@
 # MateView Guardian
 
+> [!WARNING]
+> **This project is deprecated and no longer maintained.** Testing confirmed that software can block the MateView's USB media-key events and correct its speaker volume afterward, but it cannot stop ghost touches processed internally by the monitor's Smart Bar firmware. If the monitor changes its own volume or displays its own volume overlay, the reliable solution is monitor reset, firmware service, or repair/replacement of the touch-bar hardware.
+
 MateView Guardian is a reversible, software-only workaround for a failing touch volume strip on the HUAWEI MateView GT 34-inch Sound Edition. It blocks the monitor's ghost media-key events, keeps the built-in speaker at a chosen hardware volume, and runs from the macOS menu bar or Windows notification area.
 
 It targets only display model `ZQE-CAA` and Huawei USB HID identity `12D1:10B6`.
