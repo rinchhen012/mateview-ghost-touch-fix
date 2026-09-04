@@ -39,6 +39,16 @@ public sealed partial class App : Application
             viewModel = new MainWindowViewModel(runtime.Coordinator, runtime.StartupManager);
             mainWindow = new MainWindow(viewModel, () => isQuitting);
             desktop.MainWindow = mainWindow;
+            if (desktop is IActivatableLifetime activatableLifetime)
+            {
+                activatableLifetime.Activated += (_, eventArgs) =>
+                {
+                    if (eventArgs.Kind == ActivationKind.Reopen)
+                    {
+                        ShowSettings();
+                    }
+                };
+            }
             CreateTray(desktop);
             _ = InitializeRuntimeAsync();
         }
@@ -59,7 +69,7 @@ public sealed partial class App : Application
             await settingsStore.SaveAsync(migrated);
         }
 
-        await viewModel.InitializeAsync();
+        await viewModel.InitializeAsync(applyProtection: !Program.RestoreAndExit);
         if (Program.RestoreAndExit)
         {
             await viewModel.SetProtectionEnabledAsync(false);
@@ -131,7 +141,8 @@ public sealed partial class App : Application
                 new ProcessRunner(),
                 new ElevatedProcessRunner(),
                 "powershell.exe",
-                FindResource(Path.Combine("platform-tools", "windows", "MateViewHid.ps1")));
+                FindResource(Path.Combine("platform-tools", "windows", "MateViewHid.ps1")),
+                WindowsHidProtection.ReleaseHelperSha256);
             platform = new WindowsProtection(new WindowsMonitorApi(), hid);
             var launcher = Path.Combine(
                 roamingAppData,
@@ -333,6 +344,12 @@ public sealed partial class App : Application
         if (File.Exists(direct))
         {
             return direct;
+        }
+
+        var resourceSibling = Path.GetFullPath(Path.Combine(baseDirectory, "..", relativePath));
+        if (File.Exists(resourceSibling))
+        {
+            return resourceSibling;
         }
 
         var bundleResource = Path.GetFullPath(Path.Combine(baseDirectory, "..", "Resources", relativePath));

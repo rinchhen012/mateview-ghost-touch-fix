@@ -58,6 +58,20 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task RestoreInitializationNeverAppliesProtectionBeforeClearingIt()
+    {
+        var platform = new RecordingPlatform();
+        var store = new MemorySettingsStore(GuardianSettings.Default);
+        var viewModel = new MainWindowViewModel(new ProtectionCoordinator(platform, store));
+
+        await viewModel.InitializeAsync(applyProtection: false);
+        await viewModel.SetProtectionEnabledAsync(false);
+
+        Assert.Equal(0, platform.ApplyCount);
+        Assert.Equal(1, platform.ClearCount);
+    }
+
+    [Fact]
     public async Task DiagnosticsContainUsefulStateWithoutUserPaths()
     {
         var platform = new RecordingPlatform
@@ -94,11 +108,16 @@ public sealed class MainWindowViewModelTests
         public PlatformObservation Observation { get; set; } =
             new(true, true, true, true, 30, 2, true, "ZQE-CAA", null);
         public int ClearCount { get; private set; }
+        public int ApplyCount { get; private set; }
         public List<DdcCorrection> Writes { get; } = [];
 
         public Task<IReadOnlyList<string>> ApplyHidBlockAsync(
             IReadOnlyList<string> recordedIds,
-            CancellationToken cancellationToken) => Task.FromResult(recordedIds);
+            CancellationToken cancellationToken)
+        {
+            ApplyCount++;
+            return Task.FromResult(recordedIds);
+        }
 
         public Task ClearHidBlockAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken)
         {

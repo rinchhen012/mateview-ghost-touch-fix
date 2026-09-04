@@ -113,6 +113,38 @@ public sealed class ProtectionCoordinatorTests
         Assert.Equal(platform.BlockedIds, store.Value.DisabledHidInstanceIds);
     }
 
+    [Fact]
+    public async Task HidFailureStillRunsTheIndependentSpeakerWatchdog()
+    {
+        var platform = new RecordingPlatform
+        {
+            HidException = new InvalidOperationException("UAC cancelled"),
+            Observation = new PlatformObservation(true, true, false, true, 0, 1, true, "ZQE-CAA", null),
+        };
+        var coordinator = new ProtectionCoordinator(platform, new MemorySettingsStore(GuardianSettings.Default));
+
+        var status = await coordinator.RunCycleAsync();
+
+        Assert.Equal(GuardianState.Error, status.State);
+        Assert.Equal(["hid:block", "observe", "write:62:30", "write:8D:2"], platform.Calls);
+        Assert.Contains("UAC cancelled", status.Error);
+    }
+
+    [Fact]
+    public async Task RunningGuardianHonorsAnExternalRestoreRequest()
+    {
+        var store = new MemorySettingsStore(GuardianSettings.Default);
+        var platform = new RecordingPlatform();
+        var coordinator = new ProtectionCoordinator(platform, store);
+        await coordinator.RunCycleAsync();
+        store.Replace(GuardianSettings.Default with { ProtectionEnabled = false });
+
+        var status = await coordinator.RunCycleAsync();
+
+        Assert.Equal(GuardianState.Disabled, status.State);
+        Assert.Contains("hid:clear", platform.Calls);
+    }
+
     private sealed class MemorySettingsStore(GuardianSettings value) : ISettingsStore
     {
         public GuardianSettings Value { get; private set; } = value;
@@ -124,6 +156,8 @@ public sealed class ProtectionCoordinatorTests
             Value = settings;
             return Task.CompletedTask;
         }
+
+        public void Replace(GuardianSettings settings) => Value = settings;
     }
 
     private sealed class RecordingPlatform : IPlatformProtection
@@ -136,6 +170,8 @@ public sealed class ProtectionCoordinatorTests
             new(true, true, true, true, 30, 2, true, "ZQE-CAA", null);
 
         public Exception? ObserveException { get; set; }
+
+        public Exception? HidException { get; set; }
 
         public string[] BlockedIds { get; set; } = [];
 
@@ -152,6 +188,10 @@ public sealed class ProtectionCoordinatorTests
             CancellationToken cancellationToken)
         {
             Calls.Add("hid:block");
+            if (HidException is not null)
+            {
+                throw HidException;
+            }
             return Task.FromResult<IReadOnlyList<string>>(BlockedIds);
         }
 

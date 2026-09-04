@@ -18,13 +18,24 @@ public sealed class WindowsMonitorApi : IWindowsMonitorApi
             AddPhysicalMonitors(logicalMonitor, monitors);
             return true;
         };
-        if (!NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, callback, IntPtr.Zero))
+        try
         {
-            throw LastError("enumerate display monitors");
-        }
+            if (!NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, callback, IntPtr.Zero))
+            {
+                throw LastError("enumerate display monitors");
+            }
 
-        GC.KeepAlive(callback);
-        return monitors;
+            GC.KeepAlive(callback);
+            return monitors;
+        }
+        catch
+        {
+            foreach (var monitor in monitors)
+            {
+                monitor.Dispose();
+            }
+            throw;
+        }
     }
 
     private static void AddPhysicalMonitors(

@@ -64,6 +64,9 @@ unzip -q "$mac_archive" -d "$extract_dir"
     fail 'macOS app host is not executable'
 [ -x "$extract_dir/MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/ASDDC" ] ||
     fail 'macOS DDC helper is not executable'
+codesign --verify --deep --strict \
+    "$extract_dir/MateViewGuardian-macOS-arm64/MateView Guardian.app" ||
+    fail 'macOS app signature failed strict verification'
 
 (
     cd "$temporary_dir/dist"

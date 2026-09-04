@@ -7,8 +7,12 @@ launch_agent="$HOME/Library/LaunchAgents/com.mateview.guardian.plist"
 settings_dir="$HOME/Library/Application Support/MateViewGuardian"
 
 if [ -x "$executable" ]; then
-    "$executable" --restore-and-exit || true
+    if ! "$executable" --restore-and-exit; then
+        echo "Restore failed. MateView Guardian was left installed so it can be retried." >&2
+        exit 1
+    fi
 fi
+/usr/bin/pkill -f "$target_app/Contents/" 2>/dev/null || true
 /bin/launchctl unload "$launch_agent" 2>/dev/null || true
 rm -f "$launch_agent"
 rm -rf "$settings_dir"

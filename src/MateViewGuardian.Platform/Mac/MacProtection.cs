@@ -10,6 +10,7 @@ public sealed partial class MacProtection : IPlatformProtection
     private const string Mapping = "{\"UserKeyMapping\":[{\"HIDKeyboardModifierMappingSrc\":0xC000000E9,\"HIDKeyboardModifierMappingDst\":0x700000000},{\"HIDKeyboardModifierMappingSrc\":0xC000000EA,\"HIDKeyboardModifierMappingDst\":0x700000000},{\"HIDKeyboardModifierMappingSrc\":0xC000000CD,\"HIDKeyboardModifierMappingDst\":0x700000000},{\"HIDKeyboardModifierMappingSrc\":0xC000000B1,\"HIDKeyboardModifierMappingDst\":0x700000000}]}";
     private static readonly string[] MappingSources =
         ["51539607785", "51539607786", "51539607757", "51539607729"];
+    private const string MappingDestination = "30064771072";
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IProcessRunner runner;
@@ -137,6 +138,9 @@ public sealed partial class MacProtection : IPlatformProtection
         return MappingSources.All(source =>
             result.StandardOutput.Contains(
                 $"HIDKeyboardModifierMappingSrc = {source}",
+                StringComparison.Ordinal) &&
+            result.StandardOutput.Contains(
+                $"HIDKeyboardModifierMappingDst = {MappingDestination}",
                 StringComparison.Ordinal));
     }
 

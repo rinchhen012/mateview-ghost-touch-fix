@@ -36,7 +36,7 @@ public sealed class WindowsHidTests
     [Fact]
     public async Task DisableUsesOneElevatedBatchAndReturnsExactRecoveryIds()
     {
-        var processes = new QueueProcessRunner(Result("[\"" + JsonEscape(MateViewOne) + "\"]"));
+        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewOne, "Enabled")));
         var elevation = new RecordingElevationRunner();
         var protection = Create(processes, elevation);
 
@@ -66,6 +66,61 @@ public sealed class WindowsHidTests
     }
 
     [Fact]
+    public async Task RecordedButEnabledDeviceIsDisabledAgain()
+    {
+        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewOne, "Enabled")));
+        var elevation = new RecordingElevationRunner();
+        var protection = Create(processes, elevation);
+
+        await protection.DisableAsync([MateViewOne], default);
+
+        Assert.Single(elevation.Calls);
+    }
+
+    [Fact]
+    public async Task ElevationDenialIsNotPromptedAgainUntilTheUserRetries()
+    {
+        var processes = new QueueProcessRunner(
+            Result(DeviceJson(MateViewOne, "Enabled")),
+            Result(DeviceJson(MateViewOne, "Enabled")));
+        var elevation = new RecordingElevationRunner
+        {
+            Result = new ElevatedProcessResult(false, true, -1),
+        };
+        var protection = Create(processes, elevation);
+
+        await Assert.ThrowsAsync<ElevationDeniedException>(() => protection.DisableAsync([], default));
+        await Assert.ThrowsAsync<ElevationDeniedException>(() => protection.DisableAsync([], default));
+
+        Assert.Single(elevation.Calls);
+    }
+
+    [Fact]
+    public async Task RefusesToElevateWhenTheBundledHelperWasModified()
+    {
+        var helper = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(helper, "modified");
+            var elevation = new RecordingElevationRunner();
+            var protection = new WindowsHidProtection(
+                new QueueProcessRunner(Result(DeviceJson(MateViewOne, "Enabled"))),
+                elevation,
+                "pwsh.exe",
+                helper,
+                expectedHelperSha256: "00");
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => protection.DisableAsync([], default));
+
+            Assert.Empty(elevation.Calls);
+        }
+        finally
+        {
+            File.Delete(helper);
+        }
+    }
+
+    [Fact]
     public async Task EnablePassesOnlyAllowlistedRecordedIds()
     {
         var elevation = new RecordingElevationRunner();
@@ -85,7 +140,7 @@ public sealed class WindowsHidTests
     [Fact]
     public async Task ElevationDenialIsReportedWithoutLosingRecoveryIds()
     {
-        var processes = new QueueProcessRunner(Result("[\"" + JsonEscape(MateViewOne) + "\"]"));
+        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewOne, "Enabled")));
         var elevation = new RecordingElevationRunner
         {
             Result = new ElevatedProcessResult(false, true, -1),
@@ -107,6 +162,9 @@ public sealed class WindowsHidTests
         new(exitCode, output, string.Empty);
 
     private static string JsonEscape(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal);
+
+    private static string DeviceJson(string instanceId, string status) =>
+        "[{\"instanceId\":\"" + JsonEscape(instanceId) + "\",\"status\":\"" + status + "\"}]";
 
     private sealed class QueueProcessRunner(params ProcessResult[] results) : IProcessRunner
     {

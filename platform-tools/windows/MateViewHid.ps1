@@ -10,6 +10,11 @@ param(
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = 'Stop'
 $mateViewPrefix = 'HID\VID_12D1&PID_10B6'
+$disabledProblemCode = 22
+
+function Test-WindowsPlatform {
+    return [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+}
 
 function Test-MateViewHidIdentity {
     param([AllowNull()][string] $Value)
@@ -25,27 +30,27 @@ function Test-MateViewHidIdentity {
 }
 
 function Get-MateViewHidDevices {
-    if (-not [string]::IsNullOrWhiteSpace($env:MATEVIEW_HID_FIXTURE_JSON)) {
-        $devices = @(Get-Content -LiteralPath $env:MATEVIEW_HID_FIXTURE_JSON -Raw | ConvertFrom-Json)
-    }
-    else {
-        if (-not $IsWindows) {
-            throw 'MateView HID detection is available only on Windows.'
-        }
-        $devices = @(Get-PnpDevice -Class HIDClass -ErrorAction Stop)
+    if (-not (Test-WindowsPlatform)) {
+        throw 'MateView HID detection is available only on Windows.'
     }
 
-    return @($devices |
-        ForEach-Object { $_.InstanceId } |
-        Where-Object { Test-MateViewHidIdentity $_ } |
-        Sort-Object -Unique)
+    return @(
+        Get-PnpDevice -Class HIDClass -ErrorAction Stop |
+            Where-Object { Test-MateViewHidIdentity $_.InstanceId } |
+            ForEach-Object {
+                $problem = Get-PnpDeviceProperty -InstanceId $_.InstanceId `
+                    -KeyName 'DEVPKEY_Device_ProblemCode' -ErrorAction Stop
+                [pscustomobject]@{
+                    instanceId = $_.InstanceId
+                    status = if ([int]$problem.Data -eq $disabledProblemCode) { 'Disabled' } else { 'Enabled' }
+                }
+            } |
+            Sort-Object -Property instanceId -Unique
+    )
 }
 
 function Assert-Administrator {
-    if ($env:MATEVIEW_SKIP_ADMIN_CHECK -eq '1') {
-        return
-    }
-    if (-not $IsWindows) {
+    if (-not (Test-WindowsPlatform)) {
         throw 'MateView HID changes are available only on Windows.'
     }
 
@@ -75,11 +80,25 @@ if ($validatedIds.Count -eq 0) {
 }
 
 Assert-Administrator
-$pnputil = if ([string]::IsNullOrWhiteSpace($env:PNPUTIL_BIN)) { 'pnputil.exe' } else { $env:PNPUTIL_BIN }
+$pnputil = Join-Path $env:SystemRoot 'System32\pnputil.exe'
 $verb = if ($Action -eq 'Disable') { '/disable-device' } else { '/enable-device' }
-foreach ($id in $validatedIds) {
-    & $pnputil $verb $id
-    if ($LASTEXITCODE -ne 0) {
-        throw "pnputil failed to $($Action.ToLowerInvariant()) '$id' with exit code $LASTEXITCODE."
+$disabledByThisRun = [Collections.Generic.List[string]]::new()
+try {
+    foreach ($id in $validatedIds) {
+        & $pnputil $verb $id
+        if ($LASTEXITCODE -ne 0) {
+            throw "pnputil failed to $($Action.ToLowerInvariant()) '$id' with exit code $LASTEXITCODE."
+        }
+        if ($Action -eq 'Disable') {
+            $disabledByThisRun.Add($id)
+        }
     }
+}
+catch {
+    if ($Action -eq 'Disable') {
+        foreach ($id in $disabledByThisRun) {
+            & $pnputil '/enable-device' $id
+        }
+    }
+    throw
 }

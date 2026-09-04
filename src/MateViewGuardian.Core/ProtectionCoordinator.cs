@@ -49,7 +49,7 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
         await cycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await EnsureSettingsLoadedAsync(cancellationToken).ConfigureAwait(false);
+            await EnsureSettingsLoadedAsync(cancellationToken, reload: settingsLoaded).ConfigureAwait(false);
             if (!Settings.ProtectionEnabled)
             {
                 await platform.ClearHidBlockAsync(Settings.DisabledHidInstanceIds, cancellationToken)
@@ -70,21 +70,22 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
                     error: null));
             }
 
-            var blockedIds = await platform.ApplyHidBlockAsync(
-                Settings.DisabledHidInstanceIds,
-                cancellationToken).ConfigureAwait(false);
-            var normalizedBlockedIds = blockedIds
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Select(id => id.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (!Settings.DisabledHidInstanceIds.SequenceEqual(
-                    normalizedBlockedIds,
-                    StringComparer.OrdinalIgnoreCase))
+            Exception? hidException = null;
+            try
             {
-                Settings = (Settings with { DisabledHidInstanceIds = normalizedBlockedIds }).Normalize();
-                await settingsStore.SaveAsync(Settings, cancellationToken).ConfigureAwait(false);
-                SettingsChanged?.Invoke(this, Settings);
+                var blockedIds = await platform.ApplyHidBlockAsync(
+                    Settings.DisabledHidInstanceIds,
+                    cancellationToken).ConfigureAwait(false);
+                await PersistBlockedIdsAsync(blockedIds, cancellationToken).ConfigureAwait(false);
+            }
+            catch (HidMutationFailedException exception)
+            {
+                await PersistBlockedIdsAsync(exception.RecoveryIds, cancellationToken).ConfigureAwait(false);
+                hidException = exception;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                hidException = exception;
             }
 
             var observation = await platform.ObserveAsync(cancellationToken).ConfigureAwait(false);
@@ -110,7 +111,7 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
                 observation.HidAvailable,
                 observation.HidBlocked,
                 observation.DdcHealthy,
-                error: null));
+                error: hidException?.Message));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -193,15 +194,41 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
         cycleGate.Dispose();
     }
 
-    private async Task EnsureSettingsLoadedAsync(CancellationToken cancellationToken)
+    private async Task EnsureSettingsLoadedAsync(CancellationToken cancellationToken, bool reload = false)
     {
-        if (settingsLoaded)
+        if (settingsLoaded && !reload)
         {
             return;
         }
 
-        Settings = (await settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false)).Normalize();
+        var loaded = (await settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false)).Normalize();
+        var changed = !EqualityComparer<GuardianSettings>.Default.Equals(Settings, loaded);
+        Settings = loaded;
         settingsLoaded = true;
+        if (changed)
+        {
+            SettingsChanged?.Invoke(this, Settings);
+        }
+    }
+
+    private async Task PersistBlockedIdsAsync(
+        IReadOnlyList<string> blockedIds,
+        CancellationToken cancellationToken)
+    {
+        var normalizedBlockedIds = blockedIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (Settings.DisabledHidInstanceIds.SequenceEqual(
+                normalizedBlockedIds,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Settings = (Settings with { DisabledHidInstanceIds = normalizedBlockedIds }).Normalize();
+        await settingsStore.SaveAsync(Settings, cancellationToken).ConfigureAwait(false);
         SettingsChanged?.Invoke(this, Settings);
     }
 

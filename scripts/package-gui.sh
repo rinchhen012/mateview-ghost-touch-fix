@@ -42,12 +42,16 @@ dotnet publish "$repo_root/src/MateViewGuardian.App/MateViewGuardian.App.csproj"
     -p:Version=0.2.0 -p:DebugType=None -p:DebugSymbols=false \
     -o "$publish_windows"
 
-mkdir -p "$app_root/Contents/MacOS" "$app_root/Contents/Resources"
-cp -R "$publish_mac/." "$app_root/Contents/MacOS/"
+mkdir -p "$app_root/Contents/MacOS" "$app_root/Contents/Resources/app"
+cp -R "$publish_mac/." "$app_root/Contents/Resources/app/"
+cp "$repo_root/packaging/macos/MateViewGuardian.App" "$app_root/Contents/MacOS/MateViewGuardian.App"
 cp "$repo_root/packaging/macos/Info.plist" "$app_root/Contents/Info.plist"
 cp "$ddc_dir/ASDDC" "$app_root/Contents/Resources/ASDDC"
 cp "$ddc_dir/AppleSiliconDDC-LICENSE" "$app_root/Contents/Resources/AppleSiliconDDC-LICENSE"
-chmod 755 "$app_root/Contents/MacOS/MateViewGuardian.App" "$app_root/Contents/Resources/ASDDC"
+chmod 755 \
+    "$app_root/Contents/MacOS/MateViewGuardian.App" \
+    "$app_root/Contents/Resources/app/MateViewGuardian.App" \
+    "$app_root/Contents/Resources/ASDDC"
 cp "$repo_root/packaging/macos/Install.command" "$mac_root/Install.command"
 cp "$repo_root/packaging/macos/Uninstall.command" "$mac_root/Uninstall.command"
 cp "$repo_root/packaging/macos/README.txt" "$mac_root/README.txt"
@@ -55,7 +59,12 @@ cp "$repo_root/THIRD_PARTY_NOTICES.md" "$mac_root/THIRD_PARTY_NOTICES.md"
 chmod 755 "$mac_root/Install.command" "$mac_root/Uninstall.command"
 
 if command -v codesign >/dev/null 2>&1; then
-    codesign --force --deep --sign - "$app_root"
+    find "$app_root/Contents/Resources" -type f -print | while IFS= read -r candidate; do
+        if file "$candidate" | grep -q 'Mach-O'; then
+            codesign --force --sign - "$candidate"
+        fi
+    done
+    codesign --force --sign - "$app_root"
 fi
 
 mkdir -p "$windows_root/platform-tools/windows"

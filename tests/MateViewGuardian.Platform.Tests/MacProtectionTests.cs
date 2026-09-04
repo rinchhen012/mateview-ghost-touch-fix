@@ -36,10 +36,10 @@ public sealed class MacProtectionTests
     {
         var mapping = string.Join('\n', new[]
         {
-            "HIDKeyboardModifierMappingSrc = 51539607785;",
-            "HIDKeyboardModifierMappingSrc = 51539607786;",
-            "HIDKeyboardModifierMappingSrc = 51539607757;",
-            "HIDKeyboardModifierMappingSrc = 51539607729;",
+            "HIDKeyboardModifierMappingSrc = 51539607785; HIDKeyboardModifierMappingDst = 30064771072;",
+            "HIDKeyboardModifierMappingSrc = 51539607786; HIDKeyboardModifierMappingDst = 30064771072;",
+            "HIDKeyboardModifierMappingSrc = 51539607757; HIDKeyboardModifierMappingDst = 30064771072;",
+            "HIDKeyboardModifierMappingSrc = 51539607729; HIDKeyboardModifierMappingDst = 30064771072;",
         });
         var runner = new RecordingRunner(
             Result("0x12d1 0x10b6 0x110000 1 1 MateView GT\n"),
@@ -52,15 +52,36 @@ public sealed class MacProtectionTests
     }
 
     [Fact]
+    public async Task MappingWithTheWrongDestinationIsReplaced()
+    {
+        var mapping = string.Join('\n', new[]
+        {
+            "HIDKeyboardModifierMappingSrc = 51539607785; HIDKeyboardModifierMappingDst = 1;",
+            "HIDKeyboardModifierMappingSrc = 51539607786; HIDKeyboardModifierMappingDst = 1;",
+            "HIDKeyboardModifierMappingSrc = 51539607757; HIDKeyboardModifierMappingDst = 1;",
+            "HIDKeyboardModifierMappingSrc = 51539607729; HIDKeyboardModifierMappingDst = 1;",
+        });
+        var runner = new RecordingRunner(
+            Result("0x12d1 0x10b6 0x110000 1 1 MateView GT\n"),
+            Result(mapping),
+            Result(string.Empty));
+        var protection = new MacProtection(runner, "hidutil", "ASDDC");
+
+        await protection.ApplyHidBlockAsync([], default);
+
+        Assert.Equal(3, runner.Calls.Count);
+    }
+
+    [Fact]
     public async Task ObserveSelectsZqeCaaLocationAndParsesVolume()
     {
         var detect = $"IOService:/wrong\n  product name: (ABC) OTHER\n{DisplayLocation}\n  product name:  (HWV) ZQE-CAA\n";
         var mapping = string.Join('\n', new[]
         {
-            "HIDKeyboardModifierMappingSrc = 51539607785;",
-            "HIDKeyboardModifierMappingSrc = 51539607786;",
-            "HIDKeyboardModifierMappingSrc = 51539607757;",
-            "HIDKeyboardModifierMappingSrc = 51539607729;",
+            "HIDKeyboardModifierMappingSrc = 51539607785; HIDKeyboardModifierMappingDst = 30064771072;",
+            "HIDKeyboardModifierMappingSrc = 51539607786; HIDKeyboardModifierMappingDst = 30064771072;",
+            "HIDKeyboardModifierMappingSrc = 51539607757; HIDKeyboardModifierMappingDst = 30064771072;",
+            "HIDKeyboardModifierMappingSrc = 51539607729; HIDKeyboardModifierMappingDst = 30064771072;",
         });
         var runner = new RecordingRunner(
             Result(detect),

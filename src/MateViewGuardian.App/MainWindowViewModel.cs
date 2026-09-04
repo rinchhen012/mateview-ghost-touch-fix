@@ -50,7 +50,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public GuardianState State { get; private set; } = GuardianState.Disconnected;
 
-    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(
+        bool applyProtection = true,
+        CancellationToken cancellationToken = default)
     {
         await coordinator.InitializeAsync(cancellationToken).ConfigureAwait(false);
         PublishSettings(coordinator.Settings);
@@ -59,7 +61,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             await startupManager.SetEnabledAsync(coordinator.Settings.StartAtLogin, cancellationToken)
                 .ConfigureAwait(false);
         }
-        await ApplyNowAsync(cancellationToken).ConfigureAwait(false);
+        if (applyProtection)
+        {
+            await ApplyNowAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default) =>

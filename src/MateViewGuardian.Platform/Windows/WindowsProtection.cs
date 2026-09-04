@@ -27,6 +27,7 @@ public sealed class WindowsProtection : IPlatformProtection
         IReadOnlyList<string> recordedIds,
         CancellationToken cancellationToken)
     {
+        hidProtection.ResetElevationDenial();
         await hidProtection.EnableAsync(recordedIds, cancellationToken).ConfigureAwait(false);
         hidBlocked = false;
     }
@@ -111,12 +112,12 @@ public sealed class WindowsProtection : IPlatformProtection
     private static void ValidateCorrection(DdcCorrection correction)
     {
         if ((correction.Code == 0x62 && correction.Value <= 100) ||
-            (correction.Code == 0x8D && correction.Value is 1 or 2))
+            (correction.Code == 0x8D && correction.Value == 2))
         {
             return;
         }
 
         throw new InvalidOperationException(
-            "Windows permits only VCP 0x62 volume (0-100) and 0x8D mute (1 or 2) writes.");
+            "Windows permits only VCP 0x62 volume (0-100) and 0x8D unmute (2) writes.");
     }
 }

@@ -73,6 +73,7 @@ public sealed class WindowsProtectionTests
     [Theory]
     [InlineData(0x10, 50)]
     [InlineData(0x62, 101)]
+    [InlineData(0x8D, 1)]
     [InlineData(0x8D, 0)]
     [InlineData(0x8D, 3)]
     public async Task WriteRejectsUnsafeCodesAndValues(byte code, uint value)
@@ -91,6 +92,10 @@ public sealed class WindowsProtectionTests
 
     private sealed class FakeHidProtection : IWindowsHidProtection
     {
+        public void ResetElevationDenial()
+        {
+        }
+
         public Task<IReadOnlyList<string>> DisableAsync(
             IReadOnlyList<string> recordedIds,
             CancellationToken cancellationToken) =>
