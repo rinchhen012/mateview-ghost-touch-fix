@@ -34,6 +34,7 @@ windows_archive="$temporary_dir/dist/MateViewGuardian-Windows-x64.zip"
 for entry in \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Info.plist' \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/MacOS/MateViewGuardian.App' \
+    'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/Guardian.icns' \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/ASDDC' \
     'MateViewGuardian-macOS-arm64/Install.command' \
     'MateViewGuardian-macOS-arm64/Uninstall.command' \

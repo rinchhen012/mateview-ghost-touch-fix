@@ -4,6 +4,7 @@
         x:Class="MateViewGuardian.App.MainWindow"
         x:DataType="local:MainWindowViewModel"
         Title="MateView Guardian"
+        Icon="avares://MateViewGuardian.App/Assets/guardian-protected.ico"
         Width="520" Height="650"
         MinWidth="460" MinHeight="600"
         WindowStartupLocation="CenterScreen">
