@@ -185,12 +185,37 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
             return;
         }
 
-        var actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(helperPath)));
-        if (!string.Equals(actual, expectedHelperSha256, StringComparison.OrdinalIgnoreCase))
+        var helperBytes = File.ReadAllBytes(helperPath);
+        var actual = Convert.ToHexString(SHA256.HashData(helperBytes));
+        if (!string.Equals(actual, expectedHelperSha256, StringComparison.OrdinalIgnoreCase) &&
+            !MatchesHashAfterNormalizingWindowsLineEndings(helperBytes))
         {
             throw new InvalidOperationException(
                 "The bundled MateView HID helper was changed. Reinstall MateView Guardian before approving UAC.");
         }
+    }
+
+    private bool MatchesHashAfterNormalizingWindowsLineEndings(byte[] helperBytes)
+    {
+        if (!helperBytes.AsSpan().Contains((byte)'\r'))
+        {
+            return false;
+        }
+
+        var normalized = new byte[helperBytes.Length];
+        var length = 0;
+        for (var index = 0; index < helperBytes.Length; index++)
+        {
+            if (helperBytes[index] == '\r' && index + 1 < helperBytes.Length && helperBytes[index + 1] == '\n')
+            {
+                continue;
+            }
+
+            normalized[length++] = helperBytes[index];
+        }
+
+        var actual = Convert.ToHexString(SHA256.HashData(normalized.AsSpan(0, length)));
+        return string.Equals(actual, expectedHelperSha256, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<HidDevice> ParseAllowedDevices(string json)

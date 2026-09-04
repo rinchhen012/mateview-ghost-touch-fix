@@ -1,6 +1,8 @@
 using MateViewGuardian.Core;
 using MateViewGuardian.Platform;
 using MateViewGuardian.Platform.Windows;
+using System.Security.Cryptography;
+using System.Text;
 using Xunit;
 
 namespace MateViewGuardian.Platform.Tests;
@@ -206,6 +208,33 @@ public sealed class WindowsHidTests
         var call = Assert.Single(elevation.Calls);
         Assert.Contains("Enable", call.Arguments);
         Assert.Equal([MateViewConsumerControl, MateViewHeadset], ElevatedIds(call));
+    }
+
+    [Fact]
+    public async Task AcceptsBundledHelperWhenWindowsLineEndingsDifferFromTheReleaseHash()
+    {
+        var helper = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(helper, "first\r\nsecond\r\n", new UTF8Encoding(false));
+            var expectedHash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes("first\nsecond\n")));
+            var elevation = new RecordingElevationRunner();
+            var protection = new WindowsHidProtection(
+                new QueueProcessRunner(Result(DeviceJson(MateViewConsumerControl, "Enabled"))),
+                elevation,
+                "pwsh.exe",
+                helper,
+                expectedHash);
+
+            await protection.DisableAsync([], default);
+
+            Assert.Single(elevation.Calls);
+        }
+        finally
+        {
+            File.Delete(helper);
+        }
     }
 
     [Fact]

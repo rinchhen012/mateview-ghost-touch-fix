@@ -28,4 +28,10 @@
     <AvaloniaResource Include="Assets/guardian-*.png" />
     <AvaloniaResource Include="Assets/guardian-*.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../platform-tools/windows/MateViewHid.ps1"
+             Link="platform-tools/windows/MateViewHid.ps1"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
