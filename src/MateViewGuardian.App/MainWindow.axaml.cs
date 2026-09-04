@@ -8,6 +8,7 @@ public sealed partial class MainWindow : Window
 {
     private MainWindowViewModel? viewModel;
     private Func<bool> isQuitting = () => false;
+    private Action requestQuit = () => { };
     private bool synchronizing;
 
     public MainWindow()
@@ -16,11 +17,12 @@ public sealed partial class MainWindow : Window
         Closing += OnClosing;
     }
 
-    public MainWindow(MainWindowViewModel viewModel, Func<bool> isQuitting)
+    public MainWindow(MainWindowViewModel viewModel, Func<bool> isQuitting, Action requestQuit)
         : this()
     {
         this.viewModel = viewModel;
         this.isQuitting = isQuitting;
+        this.requestQuit = requestQuit;
         DataContext = viewModel;
     }
 
@@ -125,12 +127,19 @@ public sealed partial class MainWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs eventArgs)
     {
-        if (isQuitting())
+        eventArgs.Cancel = RequestQuitOnClose(isQuitting(), requestQuit);
+    }
+
+    internal static bool RequestQuitOnClose(bool isQuitting, Action requestQuit)
+    {
+        ArgumentNullException.ThrowIfNull(requestQuit);
+        if (isQuitting)
         {
-            return;
+            return false;
         }
-        eventArgs.Cancel = true;
-        Hide();
+
+        requestQuit();
+        return true;
     }
 
     internal static MessageDialog CreateMessageDialog(string title, string message, string closeLabel)

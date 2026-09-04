@@ -78,13 +78,23 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
     {
         var detected = await DetectDevicesAsync(cancellationToken).ConfigureAwait(false);
         var recorded = NormalizeAllowed(recordedIds).ToArray();
-        var recoveryIds = NormalizeAllowed(detected.Select(device => device.InstanceId).Concat(recorded)).ToArray();
-        var newIds = detected
-            .Where(device => !device.IsDisabled && IsPrimaryControlCollection(device.InstanceId))
+        var recordedConsumerIds = recorded
+            .Where(IsConsumerControlCollection)
+            .ToArray();
+        var legacyVendorIds = detected
+            .Where(device => device.IsDisabled &&
+                IsLegacyVendorControlCollection(device.InstanceId) &&
+                recorded.Contains(device.InstanceId, StringComparer.OrdinalIgnoreCase))
             .Select(device => device.InstanceId)
             .ToArray();
+        var newIds = detected
+            .Where(device => !device.IsDisabled && IsConsumerControlCollection(device.InstanceId))
+            .Select(device => device.InstanceId)
+            .ToArray();
+        var recoveryIds = NormalizeAllowed(newIds.Concat(recordedConsumerIds)).ToArray();
         try
         {
+            await MutateAsync("Enable", legacyVendorIds, cancellationToken).ConfigureAwait(false);
             await MutateAsync("Disable", newIds, cancellationToken).ConfigureAwait(false);
         }
         catch (ElevationDeniedException)
@@ -101,7 +111,10 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
     }
 
     public Task EnableAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken) =>
-        MutateAsync("Enable", NormalizeAllowed(recordedIds).ToArray(), cancellationToken);
+        MutateAsync(
+            "Enable",
+            NormalizeAllowed(recordedIds).Where(IsConsumerControlCollection).ToArray(),
+            cancellationToken);
 
     private async Task MutateAsync(
         string action,
@@ -237,7 +250,10 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
             .Select(id => id.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsPrimaryControlCollection(string instanceId) =>
+    private static bool IsConsumerControlCollection(string instanceId) =>
+        instanceId.Contains("&COL02\\", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsLegacyVendorControlCollection(string instanceId) =>
         instanceId.Contains("&COL01\\", StringComparison.OrdinalIgnoreCase);
 
     private static void EnsureSuccess(ProcessResult result, string action)

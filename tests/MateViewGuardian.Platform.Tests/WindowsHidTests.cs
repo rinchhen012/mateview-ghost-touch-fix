@@ -7,12 +7,16 @@ namespace MateViewGuardian.Platform.Tests;
 
 public sealed class WindowsHidTests
 {
-    private const string MateViewOne = "HID\\VID_12D1&PID_10B6&COL01\\7&AAAA&0&0000";
+    private const string MateViewVendorControl = "HID\\VID_12D1&PID_10B6&COL01\\7&AAAA&0&0000";
     private const string MateViewTwo = "HID\\VID_12D1&PID_10B6\\8&BBBB&0&0000";
-    private const string MateViewSecondary = "HID\\VID_12D1&PID_10B6&COL02\\7&AAAA&0&0001";
+    private const string MateViewConsumerControl = "HID\\VID_12D1&PID_10B6&COL02\\7&AAAA&0&0001";
+    private const string MateViewHeadset = "HID\\VID_12D1&PID_10B6&COL03\\7&AAAA&0&0002";
+    private const string MateViewVendorSecondary = "HID\\VID_12D1&PID_10B6&COL04\\7&AAAA&0&0003";
+    private const string MateViewVendorTertiary = "HID\\VID_12D1&PID_10B6&COL05\\7&AAAA&0&0004";
+    private const string MateViewOne = MateViewConsumerControl;
 
     [Theory]
-    [InlineData(MateViewOne, true)]
+    [InlineData(MateViewVendorControl, true)]
     [InlineData("hid\\vid_12d1&pid_10b6\\one", true)]
     [InlineData("HID\\VID_12D1&PID_10B60\\one", false)]
     [InlineData("HID\\VID_12D1&PID_9999\\one", false)]
@@ -27,24 +31,24 @@ public sealed class WindowsHidTests
     public async Task DetectFiltersMalformedAndNonMateViewHelperOutput()
     {
         var processes = new QueueProcessRunner(Result(
-            "[\"" + JsonEscape(MateViewOne) + "\",\"HID\\\\VID_9999&PID_9999\\\\OTHER\",42,null]"));
+            "[\"" + JsonEscape(MateViewVendorControl) + "\",\"HID\\\\VID_9999&PID_9999\\\\OTHER\",42,null]"));
         var protection = Create(processes, new RecordingElevationRunner());
 
         var ids = await protection.DetectAsync(default);
 
-        Assert.Equal([MateViewOne], ids);
+        Assert.Equal([MateViewVendorControl], ids);
     }
 
     [Fact]
     public async Task DisableUsesOneElevatedBatchAndReturnsExactRecoveryIds()
     {
-        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewOne, "Enabled")));
+        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewConsumerControl, "Enabled")));
         var elevation = new RecordingElevationRunner();
         var protection = Create(processes, elevation);
 
         var ids = await protection.DisableAsync([MateViewTwo], default);
 
-        Assert.Equal([MateViewOne, MateViewTwo], ids);
+        Assert.Equal([MateViewConsumerControl], ids);
         var call = Assert.Single(elevation.Calls);
         Assert.Equal("pwsh.exe", call.FileName);
         Assert.Contains("-Action", call.Arguments);
@@ -55,42 +59,44 @@ public sealed class WindowsHidTests
     }
 
     [Fact]
-    public async Task DisableTargetsOnlyThePrimaryMateViewControlCollection()
+    public async Task DisableTargetsOnlyTheMateViewConsumerControlCollection()
     {
         var processes = new QueueProcessRunner(Result(
-            "[" + DeviceJsonValue(MateViewOne, "Enabled") + "," +
-            DeviceJsonValue(MateViewSecondary, "Enabled") + "]"));
+            "[" + DeviceJsonValue(MateViewVendorControl, "Enabled") + "," +
+            DeviceJsonValue(MateViewConsumerControl, "Enabled") + "," +
+            DeviceJsonValue(MateViewHeadset, "Enabled") + "," +
+            DeviceJsonValue(MateViewVendorSecondary, "Enabled") + "," +
+            DeviceJsonValue(MateViewVendorTertiary, "Enabled") + "]"));
         var elevation = new RecordingElevationRunner();
         var protection = Create(processes, elevation);
 
         await protection.DisableAsync([], default);
 
         var call = Assert.Single(elevation.Calls);
-        Assert.Contains(MateViewOne, call.Arguments);
-        Assert.DoesNotContain(MateViewSecondary, call.Arguments);
+        Assert.Equal([MateViewConsumerControl], ElevatedIds(call));
     }
 
     [Fact]
     public async Task AlreadyRecordedDevicesDoNotRequestElevationAgain()
     {
-        var processes = new QueueProcessRunner(Result("[\"" + JsonEscape(MateViewOne) + "\"]"));
+        var processes = new QueueProcessRunner(Result("[\"" + JsonEscape(MateViewConsumerControl) + "\"]"));
         var elevation = new RecordingElevationRunner();
         var protection = Create(processes, elevation);
 
-        var ids = await protection.DisableAsync([MateViewOne], default);
+        var ids = await protection.DisableAsync([MateViewConsumerControl], default);
 
-        Assert.Equal([MateViewOne], ids);
+        Assert.Equal([MateViewConsumerControl], ids);
         Assert.Empty(elevation.Calls);
     }
 
     [Fact]
     public async Task RecordedButEnabledDeviceIsDisabledAgain()
     {
-        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewOne, "Enabled")));
+        var processes = new QueueProcessRunner(Result(DeviceJson(MateViewConsumerControl, "Enabled")));
         var elevation = new RecordingElevationRunner();
         var protection = Create(processes, elevation);
 
-        await protection.DisableAsync([MateViewOne], default);
+        await protection.DisableAsync([MateViewConsumerControl], default);
 
         Assert.Single(elevation.Calls);
     }
@@ -187,20 +193,46 @@ public sealed class WindowsHidTests
     }
 
     [Fact]
-    public async Task EnablePassesOnlyAllowlistedRecordedIds()
+    public async Task EnableRestoresOnlyTheRecordedMateViewConsumerControl()
     {
         var elevation = new RecordingElevationRunner();
         var protection = Create(new QueueProcessRunner(), elevation);
 
         await protection.EnableAsync(
-            [MateViewOne, "HID\\VID_9999&PID_9999\\OTHER", MateViewOne.ToLowerInvariant()],
+            [MateViewVendorControl, MateViewConsumerControl, MateViewHeadset,
+                "HID\\VID_9999&PID_9999\\OTHER", MateViewConsumerControl.ToLowerInvariant()],
             default);
 
         var call = Assert.Single(elevation.Calls);
         Assert.Contains("Enable", call.Arguments);
-        Assert.Equal(1, call.Arguments.Count(argument =>
-            string.Equals(argument, MateViewOne, StringComparison.OrdinalIgnoreCase)));
-        Assert.DoesNotContain(call.Arguments, argument => argument.Contains("9999", StringComparison.Ordinal));
+        Assert.Equal([MateViewConsumerControl], ElevatedIds(call));
+    }
+
+    [Fact]
+    public async Task DisableMigratesTheLegacyVendorCollectionAndRecordsOnlyConsumerControl()
+    {
+        var processes = new QueueProcessRunner(Result(
+            "[" + DeviceJsonValue(MateViewVendorControl, "Disabled") + "," +
+            DeviceJsonValue(MateViewConsumerControl, "Enabled") + "," +
+            DeviceJsonValue(MateViewHeadset, "Enabled") + "]"));
+        var elevation = new RecordingElevationRunner();
+        var protection = Create(processes, elevation);
+
+        var ids = await protection.DisableAsync([MateViewVendorControl, MateViewHeadset], default);
+
+        Assert.Equal([MateViewConsumerControl], ids);
+        Assert.Collection(
+            elevation.Calls,
+            call =>
+            {
+                Assert.Contains("Enable", call.Arguments);
+                Assert.Equal([MateViewVendorControl], ElevatedIds(call));
+            },
+            call =>
+            {
+                Assert.Contains("Disable", call.Arguments);
+                Assert.Equal([MateViewConsumerControl], ElevatedIds(call));
+            });
     }
 
     [Fact]
@@ -216,7 +248,7 @@ public sealed class WindowsHidTests
         var exception = await Assert.ThrowsAsync<ElevationDeniedException>(() =>
             protection.DisableAsync([MateViewTwo], default));
 
-        Assert.Equal([MateViewOne, MateViewTwo], exception.RecoveryIds);
+        Assert.Equal([MateViewConsumerControl], exception.RecoveryIds);
     }
 
     private static WindowsHidProtection Create(
@@ -228,6 +260,13 @@ public sealed class WindowsHidTests
         new(exitCode, output, string.Empty);
 
     private static string JsonEscape(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal);
+
+    private static string[] ElevatedIds(ElevatedCall call)
+    {
+        var marker = Array.IndexOf(call.Arguments, "-InstanceId");
+        Assert.True(marker >= 0, "The elevated helper must receive instance IDs.");
+        return call.Arguments[(marker + 1)..];
+    }
 
     private static string DeviceJson(string instanceId, string status) =>
         "[" + DeviceJsonValue(instanceId, status) + "]";

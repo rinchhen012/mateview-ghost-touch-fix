@@ -39,7 +39,7 @@ public sealed partial class App : Application
             legacyMigration = runtime.Migration;
             settingsExisted = File.Exists(runtime.SettingsPath);
             viewModel = new MainWindowViewModel(runtime.Coordinator, runtime.StartupManager);
-            mainWindow = new MainWindow(viewModel, () => isQuitting);
+            mainWindow = new MainWindow(viewModel, () => isQuitting, () => _ = QuitAsync(desktop));
             desktop.MainWindow = mainWindow;
             desktop.ShutdownRequested += (_, _) => BeginExternalQuit();
             if (desktop is IActivatableLifetime activatableLifetime)

@@ -9,6 +9,18 @@ namespace MateViewGuardian.App.Tests;
 public sealed class MainWindowTests
 {
     [Fact]
+    public void ClosingTheMainWindowRequestsAFullQuit()
+    {
+        var quitRequests = 0;
+        var cancelClose = MainWindow.RequestQuitOnClose(
+            isQuitting: false,
+            requestQuit: () => quitRequests++);
+
+        Assert.True(cancelClose);
+        Assert.Equal(1, quitRequests);
+    }
+
+    [Fact]
     public void MessageDialogPlacesItsButtonRowBelowTheMessage()
     {
         var content = MainWindow.CreateMessageDialogContent("Message", "Cancel");
