@@ -12,6 +12,8 @@ public sealed class WindowsProtectionTests
     [InlineData("ZQE-CAA", "", "", true)]
     [InlineData("Generic PnP Monitor", "HUAWEI ZQE-CAA", "", true)]
     [InlineData("Generic", "", MateViewId, true)]
+    [InlineData("Generic PnP Monitor", "", "MONITOR\\HWV6A25\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\0003", true)]
+    [InlineData("Generic PnP Monitor", "", "MONITOR\\HWV6A25X\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\0003", false)]
     [InlineData("ZQE-CAAX", "", "", false)]
     [InlineData("NOTZQE-CAA", "", "", false)]
     [InlineData("Dell", "", "MONITOR\\OTHER", false)]

@@ -7,7 +7,11 @@ public static partial class WindowsMonitorIdentity
     public static bool IsMateView(string? description, string? deviceString, string? deviceId) =>
         new[] { description, deviceString, deviceId }
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Any(value => ModelRegex().IsMatch(value!));
+            .Any(value => ModelRegex().IsMatch(value!)) ||
+        IsWindowsMateViewDeviceId(deviceId);
+
+    private static bool IsWindowsMateViewDeviceId(string? deviceId) =>
+        deviceId?.StartsWith(@"MONITOR\HWV6A25\", StringComparison.OrdinalIgnoreCase) == true;
 
     [GeneratedRegex(@"(?i)(^|[^A-Z0-9])ZQE-CAA([^A-Z0-9]|$)")]
     private static partial Regex ModelRegex();
