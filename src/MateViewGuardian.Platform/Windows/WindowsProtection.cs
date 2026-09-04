@@ -1,9 +1,13 @@
+using System.ComponentModel;
 using MateViewGuardian.Core;
 
 namespace MateViewGuardian.Platform.Windows;
 
 public sealed class WindowsProtection : IPlatformProtection
 {
+    private const int ErrorGraphicsDdcCiVcpNotSupportedByMonitor =
+        unchecked((int)0xC0262584);
+
     private readonly IWindowsMonitorApi monitorApi;
     private readonly IWindowsHidProtection hidProtection;
     private bool hidBlocked;
@@ -46,8 +50,8 @@ public sealed class WindowsProtection : IPlatformProtection
             }
 
             var volume = monitor.Read(0x62);
-            var mute = monitor.Read(0x8D);
-            if (volume > 100 || mute is not (1 or 2))
+            var mute = ReadMute(monitor, out var supportsMute);
+            if (volume > 100 || (mute.HasValue && mute.Value is not (1 or 2)))
             {
                 throw new InvalidOperationException(
                     $"The MateView returned unsafe speaker state (volume {volume}, mute {mute}).");
@@ -59,8 +63,8 @@ public sealed class WindowsProtection : IPlatformProtection
                 hidBlocked,
                 true,
                 (int)volume,
-                (int)mute,
-                true,
+                mute.HasValue ? (int)mute.Value : null,
+                supportsMute,
                 monitor.Identity,
                 null));
         }
@@ -91,6 +95,22 @@ public sealed class WindowsProtection : IPlatformProtection
             {
                 monitor.Dispose();
             }
+        }
+    }
+
+    private static uint? ReadMute(IWindowsPhysicalMonitor monitor, out bool supportsMute)
+    {
+        try
+        {
+            var mute = monitor.Read(0x8D);
+            supportsMute = true;
+            return mute;
+        }
+        catch (Win32Exception exception)
+            when (exception.NativeErrorCode == ErrorGraphicsDdcCiVcpNotSupportedByMonitor)
+        {
+            supportsMute = false;
+            return null;
         }
     }
 

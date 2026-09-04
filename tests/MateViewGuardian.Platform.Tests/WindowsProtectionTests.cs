@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using MateViewGuardian.Core;
 using MateViewGuardian.Platform.Windows;
 using Xunit;
@@ -44,6 +45,40 @@ public sealed class WindowsProtectionTests
         Assert.Empty(other.Reads);
         Assert.True(other.Disposed);
         Assert.True(mateView.Disposed);
+    }
+
+    [Fact]
+    public async Task ObserveContinuesWhenMuteVcpIsUnsupported()
+    {
+        var unsupported = new Win32Exception(unchecked((int)0xC0262584));
+        var mateView = new FakeMonitor(
+            "HUAWEI ZQE-CAA", "", MateViewId, 30, 0,
+            muteReadException: unsupported);
+        var platform = Create(new FakeMonitorApi(mateView), new FakeHidProtection());
+
+        var observation = await platform.ObserveAsync(default);
+
+        Assert.True(observation.DisplayConnected);
+        Assert.True(observation.DdcHealthy);
+        Assert.Equal(30, observation.CurrentVolume);
+        Assert.Null(observation.CurrentMute);
+        Assert.False(observation.SupportsMute);
+        Assert.Equal([0x62, 0x8D], mateView.Reads);
+    }
+
+    [Fact]
+    public async Task ObservePropagatesOtherMuteReadFailures()
+    {
+        var transmissionFailure = new Win32Exception(unchecked((int)0xC0262582));
+        var mateView = new FakeMonitor(
+            "HUAWEI ZQE-CAA", "", MateViewId, 30, 0,
+            muteReadException: transmissionFailure);
+        var platform = Create(new FakeMonitorApi(mateView), new FakeHidProtection());
+
+        var exception = await Assert.ThrowsAsync<Win32Exception>(
+            () => platform.ObserveAsync(default));
+
+        Assert.Equal(transmissionFailure.NativeErrorCode, exception.NativeErrorCode);
     }
 
     [Fact]
@@ -117,7 +152,8 @@ public sealed class WindowsProtectionTests
         string deviceString,
         string deviceId,
         uint volume,
-        uint mute) : IWindowsPhysicalMonitor
+        uint mute,
+        Exception? muteReadException = null) : IWindowsPhysicalMonitor
     {
         public string Description { get; } = description;
         public string DeviceString { get; } = deviceString;
@@ -133,6 +169,7 @@ public sealed class WindowsProtectionTests
             return code switch
             {
                 0x62 => volume,
+                0x8D when muteReadException is not null => throw muteReadException,
                 0x8D => mute,
                 _ => throw new InvalidOperationException("Unexpected read."),
             };
