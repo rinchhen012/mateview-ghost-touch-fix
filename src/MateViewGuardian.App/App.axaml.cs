@@ -222,11 +222,16 @@ public sealed partial class App : Application
             Icon = TryLoadIcon(GuardianState.Disconnected),
             ToolTipText = "MateView Guardian",
             Menu = menu,
-            IsVisible = true,
+            IsVisible = false,
         };
+        if (OperatingSystem.IsMacOS())
+        {
+            MacOSProperties.SetIsTemplateIcon(trayIcon, true);
+        }
         trayIcon.Clicked += (_, _) => ShowSettings();
         viewModel.PropertyChanged += ViewModelOnPropertyChanged;
         TrayIcon.SetIcons(this, new TrayIcons { trayIcon });
+        trayIcon.IsVisible = true;
         UpdateTray();
     }
 
@@ -324,9 +329,7 @@ public sealed partial class App : Application
             GuardianState.Disabled => "disabled",
             _ => "partial",
         };
-        foreach (var extension in OperatingSystem.IsWindows()
-                     ? new[] { "ico", "png" }
-                     : new[] { "png", "ico" })
+        foreach (var extension in new[] { "ico", "png" })
         {
             var name = $"guardian-{variant}.{extension}";
             var uri = new Uri($"avares://MateViewGuardian.App/Assets/{name}");

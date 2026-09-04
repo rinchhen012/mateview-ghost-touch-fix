@@ -45,11 +45,11 @@ fi
 
 dotnet publish "$repo_root/src/MateViewGuardian.App/MateViewGuardian.App.csproj" \
     -c Release -r osx-arm64 --self-contained true --nologo \
-    -p:Version=0.2.3 -p:DebugType=None -p:DebugSymbols=false \
+    -p:Version=0.2.4 -p:DebugType=None -p:DebugSymbols=false \
     -o "$publish_mac"
 dotnet publish "$repo_root/src/MateViewGuardian.App/MateViewGuardian.App.csproj" \
     -c Release -r win-x64 --self-contained true --nologo \
-    -p:Version=0.2.3 -p:DebugType=None -p:DebugSymbols=false \
+    -p:Version=0.2.4 -p:DebugType=None -p:DebugSymbols=false \
     -o "$publish_windows"
 
 mkdir -p "$app_root/Contents/MacOS" "$app_root/Contents/Resources/app"
