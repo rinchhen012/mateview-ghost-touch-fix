@@ -19,6 +19,7 @@ public sealed partial class App : Application
     private MainWindowViewModel? viewModel;
     private TrayIcon? trayIcon;
     private readonly MacStatusMenuLauncher macStatusMenuLauncher = new();
+    private readonly MacMenuCommandServer macMenuCommandServer = new();
     private NativeMenuItem? protectionItem;
     private NativeMenuItem? startupItem;
     private JsonSettingsStore? settingsStore;
@@ -40,6 +41,7 @@ public sealed partial class App : Application
             viewModel = new MainWindowViewModel(runtime.Coordinator, runtime.StartupManager);
             mainWindow = new MainWindow(viewModel, () => isQuitting);
             desktop.MainWindow = mainWindow;
+            desktop.ShutdownRequested += (_, _) => BeginExternalQuit();
             if (desktop is IActivatableLifetime activatableLifetime)
             {
                 activatableLifetime.Activated += (_, eventArgs) =>
@@ -82,6 +84,7 @@ public sealed partial class App : Application
             isQuitting = true;
             trayIcon?.Dispose();
             macStatusMenuLauncher.Dispose();
+            macMenuCommandServer.Dispose();
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
             {
                 lifetime.Shutdown();
@@ -184,6 +187,7 @@ public sealed partial class App : Application
 
         if (OperatingSystem.IsMacOS())
         {
+            macMenuCommandServer.Start(HandleMacMenuCommandAsync);
             macStatusMenuLauncher.Start(FindResource("MateViewGuardianMenuBar"), FindMacAppBundle());
             return;
         }
@@ -280,8 +284,75 @@ public sealed partial class App : Application
         isQuitting = true;
         trayIcon?.Dispose();
         macStatusMenuLauncher.Dispose();
+        macMenuCommandServer.Dispose();
         await viewModel.StopAsync();
         desktop.Shutdown();
+    }
+
+    private void BeginExternalQuit()
+    {
+        if (isQuitting)
+        {
+            return;
+        }
+
+        isQuitting = true;
+        trayIcon?.Dispose();
+        macStatusMenuLauncher.Dispose();
+        macMenuCommandServer.Dispose();
+        if (viewModel is not null)
+        {
+            _ = viewModel.StopAsync();
+        }
+    }
+
+    private Task HandleMacMenuCommandAsync(string command)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                if (viewModel is not null)
+                {
+                    switch (command)
+                    {
+                        case "toggle-protection":
+                            await viewModel.SetProtectionEnabledAsync(!viewModel.ProtectionEnabled);
+                            break;
+                        case "toggle-startup":
+                            await viewModel.SetStartAtLoginAsync(!viewModel.StartAtLogin);
+                            break;
+                        case "set-volume-20":
+                        case "set-volume-30":
+                        case "set-volume-40":
+                        case "set-volume-60":
+                            await viewModel.SetDesiredVolumeAsync(int.Parse(command.AsSpan("set-volume-".Length)));
+                            break;
+                        case "diagnostics":
+                            mainWindow?.ShowDiagnostics();
+                            break;
+                        case "show-settings":
+                            ShowSettings();
+                            break;
+                        case "quit":
+                            BeginExternalQuit();
+                            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                            {
+                                desktop.Shutdown();
+                            }
+                            break;
+                    }
+                    mainWindow?.SynchronizeControls();
+                }
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        });
+        return completion.Task;
     }
 
     private void ShowSettings()

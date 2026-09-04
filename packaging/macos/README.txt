@@ -1,4 +1,4 @@
-MateView Guardian 0.2.5 for Apple Silicon macOS
+MateView Guardian 0.2.7 for Apple Silicon macOS
 
 1. Double-click Install.command. If macOS blocks it, Control-click it and choose Open.
 2. Approve the copy to /Applications if macOS asks.
