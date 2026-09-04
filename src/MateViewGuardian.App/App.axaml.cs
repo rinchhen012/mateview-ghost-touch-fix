@@ -18,6 +18,7 @@ public sealed partial class App : Application
     private MainWindow? mainWindow;
     private MainWindowViewModel? viewModel;
     private TrayIcon? trayIcon;
+    private readonly MacStatusMenuLauncher macStatusMenuLauncher = new();
     private NativeMenuItem? protectionItem;
     private NativeMenuItem? startupItem;
     private JsonSettingsStore? settingsStore;
@@ -80,6 +81,7 @@ public sealed partial class App : Application
             }
             isQuitting = true;
             trayIcon?.Dispose();
+            macStatusMenuLauncher.Dispose();
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
             {
                 lifetime.Shutdown();
@@ -180,6 +182,12 @@ public sealed partial class App : Application
             return;
         }
 
+        if (OperatingSystem.IsMacOS())
+        {
+            macStatusMenuLauncher.Start(FindResource("MateViewGuardianMenuBar"), FindMacAppBundle());
+            return;
+        }
+
         var menu = new NativeMenu();
         var show = new NativeMenuItem("Show Settings");
         show.Click += (_, _) => ShowSettings();
@@ -224,10 +232,6 @@ public sealed partial class App : Application
             Menu = menu,
             IsVisible = false,
         };
-        if (OperatingSystem.IsMacOS())
-        {
-            MacOSProperties.SetIsTemplateIcon(trayIcon, true);
-        }
         trayIcon.Clicked += (_, _) => ShowSettings();
         viewModel.PropertyChanged += ViewModelOnPropertyChanged;
         TrayIcon.SetIcons(this, new TrayIcons { trayIcon });
@@ -275,6 +279,7 @@ public sealed partial class App : Application
 
         isQuitting = true;
         trayIcon?.Dispose();
+        macStatusMenuLauncher.Dispose();
         await viewModel.StopAsync();
         desktop.Shutdown();
     }
@@ -358,6 +363,12 @@ public sealed partial class App : Application
 
         var bundleResource = Path.GetFullPath(Path.Combine(baseDirectory, "..", "Resources", relativePath));
         return File.Exists(bundleResource) ? bundleResource : direct;
+    }
+
+    private static string FindMacAppBundle()
+    {
+        var bundle = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+        return Directory.Exists(bundle) ? bundle : "/Applications/MateView Guardian.app";
     }
 
     private static async Task StopLegacyMacAsync(string plistPath, CancellationToken cancellationToken)

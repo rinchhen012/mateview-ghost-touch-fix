@@ -1,4 +1,4 @@
-MateView Guardian 0.2.4 for 64-bit Windows 10/11
+MateView Guardian 0.2.5 for 64-bit Windows 10/11
 
 Recommended wiring:
 - DisplayPort from the graphics card for 3440 x 1440 at 165 Hz and audio.

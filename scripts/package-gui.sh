@@ -26,6 +26,8 @@ for size in 16 32 128 256 512; do
         --out "$iconset_dir/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$iconset_dir" -o "$staging_root/Guardian.icns"
+swiftc -framework AppKit "$repo_root/platform-tools/macos/MateViewGuardianMenuBar.swift" \
+    -o "$staging_root/MateViewGuardianMenuBar"
 
 if [ -n "${MATEVIEW_DDC_BINARY:-}" ]; then
     [ -x "$MATEVIEW_DDC_BINARY" ] || {
@@ -45,11 +47,11 @@ fi
 
 dotnet publish "$repo_root/src/MateViewGuardian.App/MateViewGuardian.App.csproj" \
     -c Release -r osx-arm64 --self-contained true --nologo \
-    -p:Version=0.2.4 -p:DebugType=None -p:DebugSymbols=false \
+    -p:Version=0.2.5 -p:DebugType=None -p:DebugSymbols=false \
     -o "$publish_mac"
 dotnet publish "$repo_root/src/MateViewGuardian.App/MateViewGuardian.App.csproj" \
     -c Release -r win-x64 --self-contained true --nologo \
-    -p:Version=0.2.4 -p:DebugType=None -p:DebugSymbols=false \
+    -p:Version=0.2.5 -p:DebugType=None -p:DebugSymbols=false \
     -o "$publish_windows"
 
 mkdir -p "$app_root/Contents/MacOS" "$app_root/Contents/Resources/app"
@@ -57,11 +59,13 @@ cp -R "$publish_mac/." "$app_root/Contents/Resources/app/"
 cp "$repo_root/packaging/macos/MateViewGuardian.App" "$app_root/Contents/MacOS/MateViewGuardian.App"
 cp "$repo_root/packaging/macos/Info.plist" "$app_root/Contents/Info.plist"
 cp "$staging_root/Guardian.icns" "$app_root/Contents/Resources/Guardian.icns"
+cp "$staging_root/MateViewGuardianMenuBar" "$app_root/Contents/Resources/MateViewGuardianMenuBar"
 cp "$ddc_dir/ASDDC" "$app_root/Contents/Resources/ASDDC"
 cp "$ddc_dir/AppleSiliconDDC-LICENSE" "$app_root/Contents/Resources/AppleSiliconDDC-LICENSE"
 chmod 755 \
     "$app_root/Contents/MacOS/MateViewGuardian.App" \
     "$app_root/Contents/Resources/app/MateViewGuardian.App" \
+    "$app_root/Contents/Resources/MateViewGuardianMenuBar" \
     "$app_root/Contents/Resources/ASDDC"
 cp "$repo_root/packaging/macos/Install.command" "$mac_root/Install.command"
 cp "$repo_root/packaging/macos/Uninstall.command" "$mac_root/Uninstall.command"

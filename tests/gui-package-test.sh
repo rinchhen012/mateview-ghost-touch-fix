@@ -35,6 +35,7 @@ for entry in \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Info.plist' \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/MacOS/MateViewGuardian.App' \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/Guardian.icns' \
+    'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/MateViewGuardianMenuBar' \
     'MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/ASDDC' \
     'MateViewGuardian-macOS-arm64/Install.command' \
     'MateViewGuardian-macOS-arm64/Uninstall.command' \
@@ -63,6 +64,8 @@ mkdir -p "$extract_dir"
 unzip -q "$mac_archive" -d "$extract_dir"
 [ -x "$extract_dir/MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/MacOS/MateViewGuardian.App" ] ||
     fail 'macOS app host is not executable'
+[ -x "$extract_dir/MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/MateViewGuardianMenuBar" ] ||
+    fail 'macOS native menu-bar helper is not executable'
 [ -x "$extract_dir/MateViewGuardian-macOS-arm64/MateView Guardian.app/Contents/Resources/ASDDC" ] ||
     fail 'macOS DDC helper is not executable'
 codesign --verify --deep --strict \
