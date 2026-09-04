@@ -226,6 +226,7 @@ public sealed partial class App : Application
         };
         trayIcon.Clicked += (_, _) => ShowSettings();
         viewModel.PropertyChanged += ViewModelOnPropertyChanged;
+        TrayIcon.SetIcons(this, new TrayIcons { trayIcon });
         UpdateTray();
     }
 
