@@ -1,3 +1,4 @@
+using MateViewGuardian.Core;
 using MateViewGuardian.Platform;
 using MateViewGuardian.Platform.Windows;
 using Xunit;
@@ -96,6 +97,54 @@ public sealed class WindowsHidTests
     }
 
     [Fact]
+    public async Task FailedElevationIsNotPromptedAgainUntilTheUserRetries()
+    {
+        var processes = new QueueProcessRunner(
+            Result(DeviceJson(MateViewOne, "Enabled")),
+            Result(DeviceJson(MateViewOne, "Enabled")),
+            Result(DeviceJson(MateViewOne, "Enabled")));
+        var elevation = new RecordingElevationRunner
+        {
+            Result = new ElevatedProcessResult(true, false, 1),
+        };
+        var protection = Create(processes, elevation);
+
+        await Assert.ThrowsAsync<HidMutationFailedException>(() => protection.DisableAsync([], default));
+        await Assert.ThrowsAsync<HidMutationFailedException>(() => protection.DisableAsync([], default));
+
+        Assert.Single(elevation.Calls);
+
+        protection.ResetElevationDenial();
+        await Assert.ThrowsAsync<HidMutationFailedException>(() => protection.DisableAsync([], default));
+
+        Assert.Equal(2, elevation.Calls.Count);
+    }
+
+    [Fact]
+    public async Task ThrownElevationFailureIsNotPromptedAgainUntilTheUserRetries()
+    {
+        var processes = new QueueProcessRunner(
+            Result(DeviceJson(MateViewOne, "Enabled")),
+            Result(DeviceJson(MateViewOne, "Enabled")),
+            Result(DeviceJson(MateViewOne, "Enabled")));
+        var elevation = new RecordingElevationRunner
+        {
+            Exception = new TimeoutException("Timed out waiting for the administrator helper."),
+        };
+        var protection = Create(processes, elevation);
+
+        await Assert.ThrowsAsync<TimeoutException>(() => protection.DisableAsync([], default));
+        await Assert.ThrowsAsync<HidMutationFailedException>(() => protection.DisableAsync([], default));
+
+        Assert.Single(elevation.Calls);
+
+        protection.ResetElevationDenial();
+        await Assert.ThrowsAsync<TimeoutException>(() => protection.DisableAsync([], default));
+
+        Assert.Equal(2, elevation.Calls.Count);
+    }
+
+    [Fact]
     public async Task RefusesToElevateWhenTheBundledHelperWasModified()
     {
         var helper = Path.GetTempFileName();
@@ -191,6 +240,8 @@ public sealed class WindowsHidTests
 
         public ElevatedProcessResult Result { get; set; } = new(true, false, 0);
 
+        public Exception? Exception { get; set; }
+
         public Task<ElevatedProcessResult> RunAsync(
             string fileName,
             IReadOnlyList<string> arguments,
@@ -198,6 +249,10 @@ public sealed class WindowsHidTests
             CancellationToken cancellationToken)
         {
             Calls.Add(new ElevatedCall(fileName, arguments.ToArray()));
+            if (Exception is not null)
+            {
+                throw Exception;
+            }
             return Task.FromResult(Result);
         }
     }

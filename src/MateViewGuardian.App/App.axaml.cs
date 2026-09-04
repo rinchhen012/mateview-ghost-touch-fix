@@ -53,6 +53,10 @@ public sealed partial class App : Application
                 };
             }
             CreateTray(desktop);
+            if (Program.ConsumeActivationRequest())
+            {
+                ShowSettings();
+            }
             _ = InitializeRuntimeAsync();
         }
 
@@ -363,6 +367,20 @@ public sealed partial class App : Application
         }
         mainWindow.Show();
         mainWindow.Activate();
+    }
+
+    internal void ActivateFromSecondInstance()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (mainWindow is null)
+            {
+                return;
+            }
+
+            Program.ConsumeActivationRequest();
+            ShowSettings();
+        });
     }
 
     private void ViewModelOnPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)

@@ -53,7 +53,7 @@ public sealed partial class MainWindow : Window
             "Stop protection?",
             "Quitting stops the volume watchdog. The HID block may remain until logout; use Restore touch strip first if you want it removed.",
             "Cancel");
-        var quit = new Button { Content = "Quit", MinWidth = 90 };
+        var quit = CreateDialogButton("Quit");
         var result = false;
         quit.Click += (_, _) =>
         {
@@ -143,7 +143,7 @@ public sealed partial class MainWindow : Window
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
-        var close = new Button { Content = closeLabel, MinWidth = 90 };
+        var close = CreateDialogButton(closeLabel);
         close.Click += (_, _) => window.Close();
         var buttons = new StackPanel
         {
@@ -159,4 +159,14 @@ public sealed partial class MainWindow : Window
         window.Content = panel;
         return window;
     }
+
+    internal static Button CreateDialogButton(string label) => new()
+    {
+        Content = label,
+        MinWidth = 90,
+        MinHeight = 40,
+        Padding = new Avalonia.Thickness(16, 8),
+        HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+        VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Center,
+    };
 }

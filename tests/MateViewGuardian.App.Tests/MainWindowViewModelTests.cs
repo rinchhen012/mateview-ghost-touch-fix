@@ -108,6 +108,19 @@ public sealed class MainWindowViewModelTests
         Assert.DoesNotContain("/Users/secret", diagnostics);
     }
 
+    [Fact]
+    public async Task ApplyNowAllowsAnotherHidElevationAttempt()
+    {
+        var platform = new RecordingPlatform();
+        var viewModel = new MainWindowViewModel(
+            new ProtectionCoordinator(platform, new MemorySettingsStore(GuardianSettings.Default)));
+
+        await viewModel.InitializeAsync();
+        await viewModel.ApplyNowAsync();
+
+        Assert.Equal(2, platform.HidElevationResetCount);
+    }
+
     private sealed class MemorySettingsStore(GuardianSettings value) : ISettingsStore
     {
         public GuardianSettings Value { get; private set; } = value;
@@ -126,7 +139,10 @@ public sealed class MainWindowViewModelTests
             new(true, true, true, true, 30, 2, true, "ZQE-CAA", null);
         public int ClearCount { get; private set; }
         public int ApplyCount { get; private set; }
+        public int HidElevationResetCount { get; private set; }
         public List<DdcCorrection> Writes { get; } = [];
+
+        public void ResetHidElevationSuppression() => HidElevationResetCount++;
 
         public Task<IReadOnlyList<string>> ApplyHidBlockAsync(
             IReadOnlyList<string> recordedIds,

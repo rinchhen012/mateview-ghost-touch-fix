@@ -44,7 +44,15 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
         }
     }
 
-    public async Task<GuardianStatus> RunCycleAsync(CancellationToken cancellationToken = default)
+    public Task<GuardianStatus> RunCycleAsync(CancellationToken cancellationToken = default) =>
+        RunCycleAsync(resetHidElevationSuppression: false, cancellationToken);
+
+    public Task<GuardianStatus> RunUserRequestedCycleAsync(CancellationToken cancellationToken = default) =>
+        RunCycleAsync(resetHidElevationSuppression: true, cancellationToken);
+
+    private async Task<GuardianStatus> RunCycleAsync(
+        bool resetHidElevationSuppression,
+        CancellationToken cancellationToken)
     {
         await cycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -68,6 +76,11 @@ public sealed class ProtectionCoordinator : IAsyncDisposable
                     hidBlocked: false,
                     ddcHealthy: false,
                     error: null));
+            }
+
+            if (resetHidElevationSuppression)
+            {
+                platform.ResetHidElevationSuppression();
             }
 
             Exception? hidException = null;

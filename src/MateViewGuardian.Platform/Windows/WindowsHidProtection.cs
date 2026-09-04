@@ -33,6 +33,7 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
     private readonly string helperPath;
     private readonly string? expectedHelperSha256;
     private bool elevationDenied;
+    private bool elevationFailed;
 
     public WindowsHidProtection(
         IProcessRunner processRunner,
@@ -54,7 +55,11 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
         return devices.Select(device => device.InstanceId).ToArray();
     }
 
-    public void ResetElevationDenial() => elevationDenied = false;
+    public void ResetElevationDenial()
+    {
+        elevationDenied = false;
+        elevationFailed = false;
+    }
 
     private async Task<IReadOnlyList<HidDevice>> DetectDevicesAsync(CancellationToken cancellationToken)
     {
@@ -112,17 +117,33 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
         {
             throw new ElevationDeniedException(instanceIds);
         }
+        if (action == "Disable" && elevationFailed)
+        {
+            throw new HidMutationFailedException(
+                "A previous administrator attempt failed. Retry from the app to try again.",
+                instanceIds);
+        }
 
         EnsureHelperIntegrity();
 
         var arguments = BaseArguments(action).ToList();
         arguments.Add("-InstanceId");
         arguments.AddRange(instanceIds);
-        var result = await elevatedRunner.RunAsync(
-            powershellPath,
-            arguments,
-            CommandTimeout,
-            cancellationToken).ConfigureAwait(false);
+        ElevatedProcessResult result;
+        try
+        {
+            result = await elevatedRunner.RunAsync(
+                powershellPath,
+                arguments,
+                CommandTimeout,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+            when (action == "Disable" && exception is not OperationCanceledException)
+        {
+            elevationFailed = true;
+            throw;
+        }
         if (result.UserDenied)
         {
             elevationDenied = true;
@@ -131,6 +152,10 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
 
         if (!result.Started || result.ExitCode != 0)
         {
+            if (action == "Disable")
+            {
+                elevationFailed = true;
+            }
             throw new HidMutationFailedException(
                 $"Could not {action.ToLowerInvariant()} the MateView touch strip (exit {result.ExitCode}).",
                 instanceIds);

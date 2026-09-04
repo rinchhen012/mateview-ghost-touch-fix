@@ -118,7 +118,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         });
 
     public Task ApplyNowAsync(CancellationToken cancellationToken = default) =>
-        ExecuteAsync(() => coordinator.RunCycleAsync(cancellationToken));
+        ExecuteAsync(() => coordinator.RunUserRequestedCycleAsync(cancellationToken));
 
     public string CreateDiagnostics()
     {

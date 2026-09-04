@@ -13,6 +13,10 @@ public sealed record PlatformObservation(
 
 public interface IPlatformProtection
 {
+    void ResetHidElevationSuppression()
+    {
+    }
+
     Task<IReadOnlyList<string>> ApplyHidBlockAsync(
         IReadOnlyList<string> recordedIds,
         CancellationToken cancellationToken);

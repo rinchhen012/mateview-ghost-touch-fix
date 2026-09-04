@@ -18,6 +18,8 @@ public sealed class WindowsProtection : IPlatformProtection
         this.hidProtection = hidProtection ?? throw new ArgumentNullException(nameof(hidProtection));
     }
 
+    public void ResetHidElevationSuppression() => hidProtection.ResetElevationDenial();
+
     public async Task<IReadOnlyList<string>> ApplyHidBlockAsync(
         IReadOnlyList<string> recordedIds,
         CancellationToken cancellationToken)
@@ -31,7 +33,7 @@ public sealed class WindowsProtection : IPlatformProtection
         IReadOnlyList<string> recordedIds,
         CancellationToken cancellationToken)
     {
-        hidProtection.ResetElevationDenial();
+        ResetHidElevationSuppression();
         await hidProtection.EnableAsync(recordedIds, cancellationToken).ConfigureAwait(false);
         hidBlocked = false;
     }
