@@ -21,7 +21,7 @@ The app is ad-hoc signed but not Apple-notarized, so Gatekeeper may show a warni
 For the highest refresh rate, use both cables:
 
 - DisplayPort from the graphics card to the monitor for 3440×1440 at 165 Hz and audio.
-- USB-C-to-USB-C from the PC to the monitor's full-function USB-C port for touch-strip HID data. Keep the monitor's selected display input on DisplayPort.
+- USB data from the monitor's full-function USB-C port to either a PC USB-C port or a USB-A port using a data-capable cable. Keep the monitor's selected display input on DisplayPort.
 
 Then:
 
@@ -36,7 +36,7 @@ The Windows build is not Authenticode-signed, so SmartScreen may warn on first l
 - Blocks the MateView touch strip's volume up, volume down, mute/play-pause, and pause host events.
 - Stops those ghost events from changing macOS/Windows volume or repeatedly opening the host volume popup.
 - Maintains the monitor's internal speaker volume at your selected target (`0–100`, default `30`).
-- On Windows, restores the monitor's unmuted state after ghost drift.
+- On Windows, restores the monitor's unmuted state when the display exposes VCP `0x8D`; volume protection continues when that optional feature is unsupported.
 - Reapplies protection after reconnect and starts at login by default.
 
 Normal keyboard buttons, system volume controls, per-app controls, wireless headphones, Bluetooth controls, and other USB devices still work. The target slider controls the monitor speaker's internal hardware volume; normal OS volume remains a separate control.
@@ -61,6 +61,8 @@ Run the included `Uninstall.command` on macOS or `Uninstall.cmd` on Windows. The
 Guardian cannot electrically disable the touch controller or LED. The LED may remain faintly lit. It also cannot suppress a volume overlay drawn by the monitor's own firmware; it prevents the corresponding host volume change and host OS popup.
 
 Windows DDC protection works over DisplayPort without USB, but blocking the touch strip requires the USB-C data cable. A changed USB port/topology can create a new HID instance and cause one new UAC prompt.
+
+Some firmware and connection combinations expose speaker-volume VCP `0x62` but not mute VCP `0x8D`. Guardian continues volume correction and USB HID protection when mute control is unavailable.
 
 This is an independent community workaround, not an official Huawei product. Use it at your own risk.
 
