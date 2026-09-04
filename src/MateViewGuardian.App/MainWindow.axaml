@@ -40,9 +40,10 @@
         <StackPanel Spacing="12">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Text="Monitor speaker target" FontWeight="SemiBold" />
-            <TextBlock Grid.Column="1" Text="{Binding DesiredVolume, StringFormat={}{0}%}" FontSize="18" />
+            <TextBlock Grid.Column="1" Text="{Binding LiveDesiredVolume, StringFormat={}{0}%}" FontSize="18" />
           </Grid>
-          <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" TickFrequency="1" />
+          <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" TickFrequency="1"
+                  ValueChanged="VolumePreviewChanged" />
           <Button HorizontalAlignment="Right" Content="Set target volume" Click="SetVolumeClicked" />
         </StackPanel>
       </Border>

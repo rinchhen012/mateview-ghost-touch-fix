@@ -95,6 +95,14 @@ public sealed partial class MainWindow : Window
         SynchronizeControls();
     }
 
+    private void VolumePreviewChanged(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (!synchronizing && viewModel is not null)
+        {
+            viewModel.SetVolumePreview((int)Math.Round(VolumeSlider.Value));
+        }
+    }
+
     private async void ApplyClicked(object? sender, RoutedEventArgs eventArgs)
     {
         if (viewModel is not null)

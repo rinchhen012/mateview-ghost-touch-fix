@@ -12,6 +12,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IStartupManager? startupManager;
     private readonly SynchronizationContext? synchronizationContext;
     private bool isBusy;
+    private int liveDesiredVolume = GuardianSettings.DefaultVolume;
 
     public MainWindowViewModel(
         ProtectionCoordinator coordinator,
@@ -29,6 +30,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool ProtectionEnabled { get; private set; } = true;
 
     public int DesiredVolume { get; private set; } = GuardianSettings.DefaultVolume;
+
+    public int LiveDesiredVolume
+    {
+        get => liveDesiredVolume;
+        private set => SetField(ref liveDesiredVolume, value);
+    }
 
     public bool StartAtLogin { get; private set; } = true;
 
@@ -96,6 +103,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }).ConfigureAwait(false);
     }
 
+    public void SetVolumePreview(int volume) => LiveDesiredVolume = Math.Clamp(volume, 0, 100);
+
     public Task SetStartAtLoginAsync(bool enabled, CancellationToken cancellationToken = default) =>
         ExecuteAsync(async () =>
         {
@@ -149,6 +158,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         ProtectionEnabled = settings.ProtectionEnabled;
         DesiredVolume = settings.DesiredVolume;
+        LiveDesiredVolume = settings.DesiredVolume;
         StartAtLogin = settings.StartAtLogin;
         OnPropertyChanged(nameof(ProtectionEnabled));
         OnPropertyChanged(nameof(DesiredVolume));

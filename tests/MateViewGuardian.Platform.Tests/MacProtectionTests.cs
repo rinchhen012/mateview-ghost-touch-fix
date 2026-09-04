@@ -138,6 +138,11 @@ public sealed class MacProtectionTests
     [Fact]
     public async Task ProcessRunnerPreservesArgumentsWithoutShellEvaluation()
     {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
         var runner = new ProcessRunner();
 
         var result = await runner.RunAsync(
@@ -154,6 +159,11 @@ public sealed class MacProtectionTests
     [Fact]
     public async Task ProcessRunnerTerminatesCommandsAfterTimeout()
     {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
         var runner = new ProcessRunner();
 
         await Assert.ThrowsAsync<TimeoutException>(() => runner.RunAsync(

@@ -42,6 +42,23 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task VolumePreviewChangesLiveWithoutPersistingOrWritingDdc()
+    {
+        var platform = new RecordingPlatform();
+        var store = new MemorySettingsStore(GuardianSettings.Default);
+        var viewModel = new MainWindowViewModel(new ProtectionCoordinator(platform, store));
+        await viewModel.InitializeAsync();
+        platform.Writes.Clear();
+
+        viewModel.SetVolumePreview(47);
+
+        Assert.Equal(47, viewModel.LiveDesiredVolume);
+        Assert.Equal(30, viewModel.DesiredVolume);
+        Assert.Equal(30, store.Value.DesiredVolume);
+        Assert.Empty(platform.Writes);
+    }
+
+    [Fact]
     public async Task StartAtLoginSettingIsPersisted()
     {
         var store = new MemorySettingsStore(GuardianSettings.Default);
