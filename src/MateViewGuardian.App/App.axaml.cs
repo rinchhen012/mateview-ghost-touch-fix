@@ -205,7 +205,7 @@ public sealed partial class App : Application
         menu.Items.Add(protectionItem);
         menu.Items.Add(new NativeMenuItemSeparator());
 
-        foreach (var preset in new[] { 20, 30, 40, 60 })
+        foreach (var preset in VolumePresets.Values)
         {
             var item = new NativeMenuItem($"Target Volume {preset}");
             item.Click += (_, _) => _ = SetPresetFromTrayAsync(preset);
@@ -323,12 +323,6 @@ public sealed partial class App : Application
                         case "toggle-startup":
                             await viewModel.SetStartAtLoginAsync(!viewModel.StartAtLogin);
                             break;
-                        case "set-volume-20":
-                        case "set-volume-30":
-                        case "set-volume-40":
-                        case "set-volume-60":
-                            await viewModel.SetDesiredVolumeAsync(int.Parse(command.AsSpan("set-volume-".Length)));
-                            break;
                         case "diagnostics":
                             mainWindow?.ShowDiagnostics();
                             break;
@@ -340,6 +334,12 @@ public sealed partial class App : Application
                             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                             {
                                 desktop.Shutdown();
+                            }
+                            break;
+                        default:
+                            if (VolumePresets.TryParseCommand(command, out var volume))
+                            {
+                                await viewModel.SetDesiredVolumeAsync(volume);
                             }
                             break;
                     }

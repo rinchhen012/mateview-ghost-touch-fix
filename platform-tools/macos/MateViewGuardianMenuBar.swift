@@ -43,7 +43,7 @@ final class MenuBarDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         protectionItem = protection
 
         let volumeMenu = NSMenu(title: "Target Volume")
-        for volume in [20, 30, 40, 60] {
+        for volume in stride(from: 0, through: 100, by: 10) {
             let volumeItem = NSMenuItem(
                 title: "Target Volume \(volume)",
                 action: #selector(setVolume(_:)),
