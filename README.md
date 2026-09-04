@@ -27,7 +27,7 @@ Then:
 
 1. Download and unzip `MateViewGuardian-Windows-x64.zip`.
 2. Double-click `Install.cmd`.
-3. Use the shield in the notification area. Windows asks for administrator approval once when Guardian disables newly detected MateView HID instances.
+3. Use the shield in the notification area. Guardian asks for administrator approval when it starts, because Windows requires that privilege to block the MateView HID control.
 
 The Windows build is not Authenticode-signed, so SmartScreen may warn on first launch. Choose **More info → Run anyway** only after checking the release checksum/source.
 

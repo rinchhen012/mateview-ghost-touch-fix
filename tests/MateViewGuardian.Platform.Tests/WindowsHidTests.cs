@@ -9,6 +9,7 @@ public sealed class WindowsHidTests
 {
     private const string MateViewOne = "HID\\VID_12D1&PID_10B6&COL01\\7&AAAA&0&0000";
     private const string MateViewTwo = "HID\\VID_12D1&PID_10B6\\8&BBBB&0&0000";
+    private const string MateViewSecondary = "HID\\VID_12D1&PID_10B6&COL02\\7&AAAA&0&0001";
 
     [Theory]
     [InlineData(MateViewOne, true)]
@@ -51,6 +52,22 @@ public sealed class WindowsHidTests
         Assert.Equal(1, call.Arguments.Count(argument => argument == "-InstanceId"));
         Assert.Contains(MateViewOne, call.Arguments);
         Assert.DoesNotContain(MateViewTwo, call.Arguments);
+    }
+
+    [Fact]
+    public async Task DisableTargetsOnlyThePrimaryMateViewControlCollection()
+    {
+        var processes = new QueueProcessRunner(Result(
+            "[" + DeviceJsonValue(MateViewOne, "Enabled") + "," +
+            DeviceJsonValue(MateViewSecondary, "Enabled") + "]"));
+        var elevation = new RecordingElevationRunner();
+        var protection = Create(processes, elevation);
+
+        await protection.DisableAsync([], default);
+
+        var call = Assert.Single(elevation.Calls);
+        Assert.Contains(MateViewOne, call.Arguments);
+        Assert.DoesNotContain(MateViewSecondary, call.Arguments);
     }
 
     [Fact]
@@ -213,7 +230,10 @@ public sealed class WindowsHidTests
     private static string JsonEscape(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal);
 
     private static string DeviceJson(string instanceId, string status) =>
-        "[{\"instanceId\":\"" + JsonEscape(instanceId) + "\",\"status\":\"" + status + "\"}]";
+        "[" + DeviceJsonValue(instanceId, status) + "]";
+
+    private static string DeviceJsonValue(string instanceId, string status) =>
+        "{\"instanceId\":\"" + JsonEscape(instanceId) + "\",\"status\":\"" + status + "\"}";
 
     private sealed class QueueProcessRunner(params ProcessResult[] results) : IProcessRunner
     {

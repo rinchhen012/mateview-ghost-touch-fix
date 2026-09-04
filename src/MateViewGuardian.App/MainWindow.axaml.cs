@@ -43,13 +43,13 @@ public sealed partial class MainWindow : Window
         {
             return;
         }
-        var window = CreateMessageWindow("Diagnostics", viewModel.CreateDiagnostics(), "Close");
-        _ = window.ShowDialog(this);
+        var dialog = CreateMessageDialog("Diagnostics", viewModel.CreateDiagnostics(), "Close");
+        _ = dialog.Window.ShowDialog(this);
     }
 
     public async Task<bool> ConfirmQuitAsync()
     {
-        var dialog = CreateMessageWindow(
+        var dialog = CreateMessageDialog(
             "Stop protection?",
             "Quitting stops the volume watchdog. The HID block may remain until logout; use Restore touch strip first if you want it removed.",
             "Cancel");
@@ -58,10 +58,10 @@ public sealed partial class MainWindow : Window
         quit.Click += (_, _) =>
         {
             result = true;
-            dialog.Close();
+            dialog.Window.Close();
         };
-        ((StackPanel)((DockPanel)dialog.Content!).Children[^1]).Children.Insert(0, quit);
-        await dialog.ShowDialog(this);
+        dialog.Buttons.Children.Insert(0, quit);
+        await dialog.Window.ShowDialog(this);
         return result;
     }
 
@@ -133,7 +133,7 @@ public sealed partial class MainWindow : Window
         Hide();
     }
 
-    private static Window CreateMessageWindow(string title, string message, string closeLabel)
+    internal static MessageDialog CreateMessageDialog(string title, string message, string closeLabel)
     {
         var window = new Window
         {
@@ -143,21 +143,42 @@ public sealed partial class MainWindow : Window
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
-        var close = CreateDialogButton(closeLabel);
-        close.Click += (_, _) => window.Close();
+        var content = CreateMessageDialogContent(message, closeLabel, window.Close);
+        window.Content = content.Grid;
+        return new MessageDialog(window, content.Buttons);
+    }
+
+    internal sealed record MessageDialog(Window Window, StackPanel Buttons);
+
+    internal sealed record MessageDialogContent(Grid Grid, StackPanel Buttons);
+
+    internal static MessageDialogContent CreateMessageDialogContent(string message, string closeLabel) =>
+        CreateMessageDialogContent(message, closeLabel, static () => { });
+
+    private static MessageDialogContent CreateMessageDialogContent(
+        string message,
+        string closeLabel,
+        Action close)
+    {
+        var closeButton = CreateDialogButton(closeLabel);
+        closeButton.Click += (_, _) => close();
         var buttons = new StackPanel
         {
             Orientation = Avalonia.Layout.Orientation.Horizontal,
             Spacing = 10,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Children = { close },
+            Children = { closeButton },
         };
-        var panel = new DockPanel { Margin = new Avalonia.Thickness(24) };
-        DockPanel.SetDock(buttons, Dock.Bottom);
-        panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
-        panel.Children.Add(buttons);
-        window.Content = panel;
-        return window;
+        var grid = new Grid
+        {
+            Margin = new Avalonia.Thickness(24),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 16,
+        };
+        grid.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
+        Grid.SetRow(buttons, 1);
+        grid.Children.Add(buttons);
+        return new MessageDialogContent(grid, buttons);
     }
 
     internal static Button CreateDialogButton(string label) => new()

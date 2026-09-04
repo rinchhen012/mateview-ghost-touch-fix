@@ -80,7 +80,7 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
         var recorded = NormalizeAllowed(recordedIds).ToArray();
         var recoveryIds = NormalizeAllowed(detected.Select(device => device.InstanceId).Concat(recorded)).ToArray();
         var newIds = detected
-            .Where(device => !device.IsDisabled)
+            .Where(device => !device.IsDisabled && IsPrimaryControlCollection(device.InstanceId))
             .Select(device => device.InstanceId)
             .ToArray();
         try
@@ -236,6 +236,9 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
         ids.Where(WindowsHidIdentity.IsAllowed)
             .Select(id => id.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsPrimaryControlCollection(string instanceId) =>
+        instanceId.Contains("&COL01\\", StringComparison.OrdinalIgnoreCase);
 
     private static void EnsureSuccess(ProcessResult result, string action)
     {

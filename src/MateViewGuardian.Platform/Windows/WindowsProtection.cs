@@ -10,6 +10,7 @@ public sealed class WindowsProtection : IPlatformProtection
 
     private readonly IWindowsMonitorApi monitorApi;
     private readonly IWindowsHidProtection hidProtection;
+    private bool hidAvailable;
     private bool hidBlocked;
 
     public WindowsProtection(IWindowsMonitorApi monitorApi, IWindowsHidProtection hidProtection)
@@ -24,9 +25,19 @@ public sealed class WindowsProtection : IPlatformProtection
         IReadOnlyList<string> recordedIds,
         CancellationToken cancellationToken)
     {
-        var ids = await hidProtection.DisableAsync(recordedIds, cancellationToken).ConfigureAwait(false);
-        hidBlocked = ids.Count > 0;
-        return ids;
+        try
+        {
+            var ids = await hidProtection.DisableAsync(recordedIds, cancellationToken).ConfigureAwait(false);
+            hidAvailable = ids.Count > 0;
+            hidBlocked = ids.Count > 0;
+            return ids;
+        }
+        catch (HidMutationFailedException exception)
+        {
+            hidAvailable = exception.RecoveryIds.Count > 0;
+            hidBlocked = false;
+            throw;
+        }
     }
 
     public async Task ClearHidBlockAsync(
@@ -35,10 +46,25 @@ public sealed class WindowsProtection : IPlatformProtection
     {
         ResetHidElevationSuppression();
         await hidProtection.EnableAsync(recordedIds, cancellationToken).ConfigureAwait(false);
+        hidAvailable = recordedIds.Count > 0;
         hidBlocked = false;
     }
 
     public Task<PlatformObservation> ObserveAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            return Task.FromResult(Observe(cancellationToken));
+        }
+        catch (ObjectDisposedException exception)
+            when (string.Equals(exception.ObjectName, "WindowsPhysicalMonitor", StringComparison.Ordinal))
+        {
+            return Task.FromResult(Observe(cancellationToken));
+        }
+    }
+
+    private PlatformObservation Observe(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var monitors = monitorApi.Enumerate();
@@ -47,8 +73,8 @@ public sealed class WindowsProtection : IPlatformProtection
             var monitor = SelectMonitor(monitors);
             if (monitor is null)
             {
-                return Task.FromResult(new PlatformObservation(
-                    false, hidBlocked, hidBlocked, false, 0, null, true, null, null));
+                return new PlatformObservation(
+                    false, hidAvailable, hidBlocked, false, 0, null, true, null, null);
             }
 
             var volume = monitor.Read(0x62);
@@ -59,16 +85,16 @@ public sealed class WindowsProtection : IPlatformProtection
                     $"The MateView returned unsafe speaker state (volume {volume}, mute {mute}).");
             }
 
-            return Task.FromResult(new PlatformObservation(
+            return new PlatformObservation(
                 true,
-                hidBlocked,
+                hidAvailable,
                 hidBlocked,
                 true,
                 (int)volume,
                 mute.HasValue ? (int)mute.Value : null,
                 supportsMute,
                 monitor.Identity,
-                null));
+                null);
         }
         finally
         {
@@ -83,13 +109,27 @@ public sealed class WindowsProtection : IPlatformProtection
     {
         cancellationToken.ThrowIfCancellationRequested();
         ValidateCorrection(correction);
+        try
+        {
+            WriteDdc(correction, cancellationToken);
+        }
+        catch (ObjectDisposedException exception)
+            when (string.Equals(exception.ObjectName, "WindowsPhysicalMonitor", StringComparison.Ordinal))
+        {
+            WriteDdc(correction, cancellationToken);
+        }
+        return Task.CompletedTask;
+    }
+
+    private void WriteDdc(DdcCorrection correction, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var monitors = monitorApi.Enumerate();
         try
         {
             var monitor = SelectMonitor(monitors) ??
                 throw new InvalidOperationException("No ZQE-CAA display was found.");
             monitor.Write(correction.Code, correction.Value);
-            return Task.CompletedTask;
         }
         finally
         {

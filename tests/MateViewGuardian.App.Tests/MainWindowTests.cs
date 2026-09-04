@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Layout;
 using MateViewGuardian.App;
 using Xunit;
@@ -7,6 +8,18 @@ namespace MateViewGuardian.App.Tests;
 
 public sealed class MainWindowTests
 {
+    [Fact]
+    public void MessageDialogPlacesItsButtonRowBelowTheMessage()
+    {
+        var content = MainWindow.CreateMessageDialogContent("Message", "Cancel");
+        var grid = content.Grid;
+
+        Assert.Equal(2, grid.RowDefinitions.Count);
+        Assert.True(grid.RowDefinitions[1].Height.IsAuto);
+        Assert.Equal(1, Grid.GetRow(content.Buttons));
+        Assert.Contains(content.Buttons, grid.Children);
+    }
+
     [Fact]
     public void DialogButtonsReserveEnoughSpaceForWindowsTextRendering()
     {

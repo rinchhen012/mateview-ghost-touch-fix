@@ -82,6 +82,42 @@ public sealed class WindowsProtectionTests
     }
 
     [Fact]
+    public async Task ObserveRetriesOnceAfterWindowsReturnsDisposedMonitorHandle()
+    {
+        var stale = new FakeMonitor(
+            "ZQE-CAA", "", MateViewId, 30, 2,
+            volumeReadException: new ObjectDisposedException("WindowsPhysicalMonitor"));
+        var healthy = new FakeMonitor("ZQE-CAA", "", MateViewId, 30, 2);
+        var platform = Create(new SequenceMonitorApi([stale], [healthy]), new FakeHidProtection());
+
+        var observation = await platform.ObserveAsync(default);
+
+        Assert.True(observation.DdcHealthy);
+        Assert.Equal(30, observation.CurrentVolume);
+        Assert.True(stale.Disposed);
+        Assert.True(healthy.Disposed);
+    }
+
+    [Fact]
+    public async Task ObservePropagatesDisposalErrorsFromOtherMonitorTypes()
+    {
+        var stale = new FakeMonitor(
+            "ZQE-CAA", "", MateViewId, 30, 2,
+            volumeReadException: new ObjectDisposedException("OtherMonitor"));
+        var healthy = new FakeMonitor("ZQE-CAA", "", MateViewId, 30, 2);
+        var monitors = new SequenceMonitorApi([stale], [healthy]);
+        var platform = Create(monitors, new FakeHidProtection());
+
+        var exception = await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => platform.ObserveAsync(default));
+
+        Assert.Equal("OtherMonitor", exception.ObjectName);
+        Assert.Equal(1, monitors.EnumerateCount);
+        Assert.True(stale.Disposed);
+        Assert.False(healthy.Disposed);
+    }
+
+    [Fact]
     public async Task MissingMateViewReturnsDisconnectedWithoutDdcWrites()
     {
         var other = new FakeMonitor("Dell", "", "MONITOR\\DELL", 50, 2);
@@ -92,6 +128,24 @@ public sealed class WindowsProtectionTests
         Assert.False(observation.DisplayConnected);
         Assert.False(observation.DdcHealthy);
         Assert.Empty(other.Reads);
+    }
+
+    [Fact]
+    public async Task HidFailureStillReportsDetectedUsbData()
+    {
+        var hid = new FakeHidProtection
+        {
+            DisableException = new HidMutationFailedException(
+                "pnputil failed", ["HID\\VID_12D1&PID_10B6&COL01\\ONE"]),
+        };
+        var mateView = new FakeMonitor("ZQE-CAA", "", MateViewId, 30, 2);
+        var platform = Create(new FakeMonitorApi(mateView), hid);
+
+        await Assert.ThrowsAsync<HidMutationFailedException>(() => platform.ApplyHidBlockAsync([], default));
+        var observation = await platform.ObserveAsync(default);
+
+        Assert.True(observation.HidAvailable);
+        Assert.False(observation.HidBlocked);
     }
 
     [Theory]
@@ -124,19 +178,62 @@ public sealed class WindowsProtectionTests
         Assert.Empty(mateView.Writes);
     }
 
+    [Fact]
+    public async Task WriteRetriesOnceAfterWindowsReturnsDisposedMonitorHandle()
+    {
+        var stale = new FakeMonitor(
+            "ZQE-CAA", "", MateViewId, 30, 2,
+            writeException: new ObjectDisposedException("WindowsPhysicalMonitor"));
+        var healthy = new FakeMonitor("ZQE-CAA", "", MateViewId, 30, 2);
+        var platform = Create(new SequenceMonitorApi([stale], [healthy]), new FakeHidProtection());
+
+        await platform.WriteDdcAsync(new DdcCorrection(0x62, 30), default);
+
+        Assert.Equal([(0x62, 30u)], healthy.Writes);
+        Assert.True(stale.Disposed);
+        Assert.True(healthy.Disposed);
+    }
+
+    [Fact]
+    public async Task WritePropagatesDisposalErrorsFromOtherMonitorTypes()
+    {
+        var stale = new FakeMonitor(
+            "ZQE-CAA", "", MateViewId, 30, 2,
+            writeException: new ObjectDisposedException("OtherMonitor"));
+        var healthy = new FakeMonitor("ZQE-CAA", "", MateViewId, 30, 2);
+        var monitors = new SequenceMonitorApi([stale], [healthy]);
+        var platform = Create(monitors, new FakeHidProtection());
+
+        var exception = await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => platform.WriteDdcAsync(new DdcCorrection(0x62, 30), default));
+
+        Assert.Equal("OtherMonitor", exception.ObjectName);
+        Assert.Equal(1, monitors.EnumerateCount);
+        Assert.True(stale.Disposed);
+        Assert.False(healthy.Disposed);
+    }
+
     private static WindowsProtection Create(IWindowsMonitorApi monitors, IWindowsHidProtection hid) =>
         new(monitors, hid);
 
     private sealed class FakeHidProtection : IWindowsHidProtection
     {
+        public Exception? DisableException { get; set; }
+
         public void ResetElevationDenial()
         {
         }
 
         public Task<IReadOnlyList<string>> DisableAsync(
             IReadOnlyList<string> recordedIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(recordedIds);
+            CancellationToken cancellationToken)
+        {
+            if (DisableException is not null)
+            {
+                throw DisableException;
+            }
+            return Task.FromResult(recordedIds);
+        }
 
         public Task EnableAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken) =>
             Task.CompletedTask;
@@ -147,13 +244,27 @@ public sealed class WindowsProtectionTests
         public IReadOnlyList<IWindowsPhysicalMonitor> Enumerate() => monitors;
     }
 
+    private sealed class SequenceMonitorApi(params FakeMonitor[][] monitorSets) : IWindowsMonitorApi
+    {
+        private readonly Queue<FakeMonitor[]> monitorSets = new(monitorSets);
+        public int EnumerateCount { get; private set; }
+
+        public IReadOnlyList<IWindowsPhysicalMonitor> Enumerate()
+        {
+            EnumerateCount++;
+            return monitorSets.Dequeue();
+        }
+    }
+
     private sealed class FakeMonitor(
         string description,
         string deviceString,
         string deviceId,
         uint volume,
         uint mute,
-        Exception? muteReadException = null) : IWindowsPhysicalMonitor
+        Exception? muteReadException = null,
+        Exception? volumeReadException = null,
+        Exception? writeException = null) : IWindowsPhysicalMonitor
     {
         public string Description { get; } = description;
         public string DeviceString { get; } = deviceString;
@@ -168,6 +279,7 @@ public sealed class WindowsProtectionTests
             Reads.Add(code);
             return code switch
             {
+                0x62 when volumeReadException is not null => throw volumeReadException,
                 0x62 => volume,
                 0x8D when muteReadException is not null => throw muteReadException,
                 0x8D => mute,
@@ -175,7 +287,14 @@ public sealed class WindowsProtectionTests
             };
         }
 
-        public void Write(byte code, uint value) => Writes.Add((code, value));
+        public void Write(byte code, uint value)
+        {
+            if (writeException is not null)
+            {
+                throw writeException;
+            }
+            Writes.Add((code, value));
+        }
 
         public void Dispose() => Disposed = true;
     }
