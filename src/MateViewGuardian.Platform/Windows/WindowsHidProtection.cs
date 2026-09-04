@@ -78,8 +78,8 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
     {
         var detected = await DetectDevicesAsync(cancellationToken).ConfigureAwait(false);
         var recorded = NormalizeAllowed(recordedIds).ToArray();
-        var recordedConsumerIds = recorded
-            .Where(IsConsumerControlCollection)
+        var recordedMediaControlIds = recorded
+            .Where(IsMediaControlCollection)
             .ToArray();
         var legacyVendorIds = detected
             .Where(device => device.IsDisabled &&
@@ -88,10 +88,10 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
             .Select(device => device.InstanceId)
             .ToArray();
         var newIds = detected
-            .Where(device => !device.IsDisabled && IsConsumerControlCollection(device.InstanceId))
+            .Where(device => !device.IsDisabled && IsMediaControlCollection(device.InstanceId))
             .Select(device => device.InstanceId)
             .ToArray();
-        var recoveryIds = NormalizeAllowed(newIds.Concat(recordedConsumerIds)).ToArray();
+        var recoveryIds = NormalizeAllowed(newIds.Concat(recordedMediaControlIds)).ToArray();
         try
         {
             await MutateAsync("Enable", legacyVendorIds, cancellationToken).ConfigureAwait(false);
@@ -113,7 +113,7 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
     public Task EnableAsync(IReadOnlyList<string> recordedIds, CancellationToken cancellationToken) =>
         MutateAsync(
             "Enable",
-            NormalizeAllowed(recordedIds).Where(IsConsumerControlCollection).ToArray(),
+            NormalizeAllowed(recordedIds).Where(IsRestoreControlCollection).ToArray(),
             cancellationToken);
 
     private async Task MutateAsync(
@@ -250,11 +250,15 @@ public sealed class WindowsHidProtection : IWindowsHidProtection
             .Select(id => id.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsConsumerControlCollection(string instanceId) =>
-        instanceId.Contains("&COL02\\", StringComparison.OrdinalIgnoreCase);
+    private static bool IsMediaControlCollection(string instanceId) =>
+        instanceId.Contains("&COL02\\", StringComparison.OrdinalIgnoreCase) ||
+        instanceId.Contains("&COL03\\", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsLegacyVendorControlCollection(string instanceId) =>
         instanceId.Contains("&COL01\\", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRestoreControlCollection(string instanceId) =>
+        IsMediaControlCollection(instanceId) || IsLegacyVendorControlCollection(instanceId);
 
     private static void EnsureSuccess(ProcessResult result, string action)
     {

@@ -59,7 +59,7 @@ public sealed class WindowsHidTests
     }
 
     [Fact]
-    public async Task DisableTargetsOnlyTheMateViewConsumerControlCollection()
+    public async Task DisableTargetsOnlyTheMateViewMediaControlCollections()
     {
         var processes = new QueueProcessRunner(Result(
             "[" + DeviceJsonValue(MateViewVendorControl, "Enabled") + "," +
@@ -73,7 +73,7 @@ public sealed class WindowsHidTests
         await protection.DisableAsync([], default);
 
         var call = Assert.Single(elevation.Calls);
-        Assert.Equal([MateViewConsumerControl], ElevatedIds(call));
+        Assert.Equal([MateViewConsumerControl, MateViewHeadset], ElevatedIds(call));
     }
 
     [Fact]
@@ -193,23 +193,36 @@ public sealed class WindowsHidTests
     }
 
     [Fact]
-    public async Task EnableRestoresOnlyTheRecordedMateViewConsumerControl()
+    public async Task EnableRestoresOnlyTheRecordedMateViewMediaControlCollections()
     {
         var elevation = new RecordingElevationRunner();
         var protection = Create(new QueueProcessRunner(), elevation);
 
         await protection.EnableAsync(
-            [MateViewVendorControl, MateViewConsumerControl, MateViewHeadset,
+            [MateViewConsumerControl, MateViewHeadset,
                 "HID\\VID_9999&PID_9999\\OTHER", MateViewConsumerControl.ToLowerInvariant()],
             default);
 
         var call = Assert.Single(elevation.Calls);
         Assert.Contains("Enable", call.Arguments);
-        Assert.Equal([MateViewConsumerControl], ElevatedIds(call));
+        Assert.Equal([MateViewConsumerControl, MateViewHeadset], ElevatedIds(call));
     }
 
     [Fact]
-    public async Task DisableMigratesTheLegacyVendorCollectionAndRecordsOnlyConsumerControl()
+    public async Task EnableRestoresTheRecordedLegacyVendorControlForUpgradeRecovery()
+    {
+        var elevation = new RecordingElevationRunner();
+        var protection = Create(new QueueProcessRunner(), elevation);
+
+        await protection.EnableAsync([MateViewVendorControl, MateViewVendorSecondary], default);
+
+        var call = Assert.Single(elevation.Calls);
+        Assert.Contains("Enable", call.Arguments);
+        Assert.Equal([MateViewVendorControl], ElevatedIds(call));
+    }
+
+    [Fact]
+    public async Task DisableMigratesTheLegacyVendorCollectionAndRecordsOnlyMediaControls()
     {
         var processes = new QueueProcessRunner(Result(
             "[" + DeviceJsonValue(MateViewVendorControl, "Disabled") + "," +
@@ -220,7 +233,7 @@ public sealed class WindowsHidTests
 
         var ids = await protection.DisableAsync([MateViewVendorControl, MateViewHeadset], default);
 
-        Assert.Equal([MateViewConsumerControl], ids);
+        Assert.Equal([MateViewConsumerControl, MateViewHeadset], ids);
         Assert.Collection(
             elevation.Calls,
             call =>
@@ -231,7 +244,7 @@ public sealed class WindowsHidTests
             call =>
             {
                 Assert.Contains("Disable", call.Arguments);
-                Assert.Equal([MateViewConsumerControl], ElevatedIds(call));
+                Assert.Equal([MateViewConsumerControl, MateViewHeadset], ElevatedIds(call));
             });
     }
 

@@ -1,4 +1,4 @@
-MateView Guardian 0.2.12 for 64-bit Windows 10/11
+MateView Guardian 0.2.13 for 64-bit Windows 10/11
 
 Recommended wiring:
 - DisplayPort from the graphics card for 3440 x 1440 at 165 Hz and audio.
@@ -7,7 +7,7 @@ Recommended wiring:
 
 Double-click Install.cmd, then use the notification-area shield. Guardian asks
 for administrator approval when it starts so Windows can disable the MateView
-HID consumer-control instance (the source of the monitor's volume-button events).
+HID media-control instances (the monitor's consumer volume and headset mute events).
 
 Normal Windows, keyboard, application, headphone, and Bluetooth volume controls
 keep working. Run Uninstall.cmd to restore the touch strip and remove the app.
